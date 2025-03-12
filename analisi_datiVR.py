@@ -300,7 +300,7 @@ class analisi:
 
 # MAIN Program
 
-from os import chdir
+from os import chdir, getcwd
 chdir('/Users/theo/Desktop/Ermes/Misure')
 
 f = manager()
