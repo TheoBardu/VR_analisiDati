@@ -5,7 +5,7 @@
 import pandas as pd
 import openpyxl as ex
 from openpyxl.styles import PatternFill
-from numpy import zeros, arange
+from numpy import zeros, arange, mean, std, max
 
 
 file = '/Users/theo/Desktop/Ermes/Misure/misF/misF/LSOURCES - Copia.txt'
@@ -64,7 +64,7 @@ class files:
 
     def read_measure_file(file):
         '''
-        Funzione che legge il file di misura e restituisce un dataframe pandas.
+        Funzione che legge il file di misura in txt e restituisce un dataframe pandas.
 
         INPUT:
             file = <str>, directory del file da leggere
@@ -143,44 +143,44 @@ class files:
                 #salvataggio livelli euqalizzati A e durata tracciati
                 l7 = lines[indx+7].split() #questa è la riga dei livelli LeqA
                 # print(l7)
-                LeqA_min.append(l7[5]); durata.append(l7[8])
-                LeqA_min.append(l7[9]); durata.append(l7[12])
-                LeqA_min.append(l7[13]); durata.append(l7[16])
+                LeqA_min.append(float(l7[5])); durata.append(l7[8])
+                LeqA_min.append(float(l7[9])); durata.append(l7[12])
+                LeqA_min.append(float(l7[13])); durata.append(l7[16])
                 
-                LeqA_max.append(l7[6])
-                LeqA_max.append(l7[10])
-                LeqA_max.append(l7[14])
+                LeqA_max.append(float(l7[6]))
+                LeqA_max.append(float(l7[10]))
+                LeqA_max.append(float(l7[14]))
 
-                LeqA_eq.append(l7[7])
-                LeqA_eq.append(l7[11])
-                LeqA_eq.append(l7[15])
+                LeqA_eq.append(float(l7[7]))
+                LeqA_eq.append(float(l7[11]))
+                LeqA_eq.append(float(l7[15]))
 
 
                 # salvataggio livelli equalizzati C
                 l8 = lines[indx+8].split() #questa è la riga dei livelli C
                 # print(l8)
-                LeqC_min.append(l8[5])
-                LeqC_min.append(l8[9])
-                LeqC_min.append(l8[13]) 
+                LeqC_min.append(float(l8[5]))
+                LeqC_min.append(float(l8[9]))
+                LeqC_min.append(float(l8[13])) 
 
-                LeqC_max.append(l8[6])
-                LeqC_max.append(l8[10])
-                LeqC_max.append(l8[14])
+                LeqC_max.append(float(l8[6]))
+                LeqC_max.append(float(l8[10]))
+                LeqC_max.append(float(l8[14]))
 
-                LeqC_eq.append(l8[7])
-                LeqC_eq.append(l8[11])
-                LeqC_eq.append(l8[15])  
+                LeqC_eq.append(float(l8[7]))
+                LeqC_eq.append(float(l8[11]))
+                LeqC_eq.append(float(l8[15]))  
 
                 #salvataggio picchi C
                 l9 = lines[indx+9].split()
                 # print(l9)
-                PeakC_max.append(l9[5])
-                PeakC_max.append(l9[8])
-                PeakC_max.append(l9[11])
+                PeakC_max.append(float(l9[5]))
+                PeakC_max.append(float(l9[8]))
+                PeakC_max.append(float(l9[11]))
 
-                PeakC_eq.append(l9[6])
-                PeakC_eq.append(l9[9])
-                PeakC_eq.append(l9[12])
+                PeakC_eq.append(float(l9[6]))
+                PeakC_eq.append(float(l9[9]))
+                PeakC_eq.append(float(l9[12]))
 
 
 
@@ -207,7 +207,7 @@ class files:
         # df['inizio'] = inizio
         # print(nFiles) #for debug
         print('Lettura e creazione dataFrame completata')
-        return df
+        return df, ntracks[-1], nFiles
 
 
     def write_csv(df,file):
@@ -255,9 +255,11 @@ class manager:
         print(f'Directory di lavoro: {self.main_dir}') #stampa la directory di lavoro
 
         self.file_list = listdir(self.main_dir) #salva la lista dei file nella directory principale
+        # print(self.file_list)
         if ".DS_Store" in self.file_list:
             self.file_list.remove(".DS_Store")
-        elif "data" in self.file_list:
+        
+        if "data" in self.file_list:
             self.file_list.remove("data")
         
         print(f'Lista dei file nella directory: {self.file_list}') # stampa la lista dei file nella directory principale
@@ -265,7 +267,8 @@ class manager:
 
     def iterate_directory(self,file_name = 'LSOURCES - Copia.txt'):
         '''
-        Funzione che itera su tutte le directory per salvare i file
+        Funzione che itera su tutte le directory per salvare i file.
+        Crea i file csv e xlsx e colora le colonne opportune del file xlsx.
         '''
         from os import path, mkdir
         for dir in self.file_list:
@@ -278,14 +281,14 @@ class manager:
             
         
 
-            df = files.read_measure_file(file_name)
+            df, num_of_track, n_files = files.read_measure_file(file_name)
             files.write_csv(df, f'{self.out_file_dir}/{dir}.csv')
             files.write_exel(df, f'{self.out_file_dir}/{dir}.xlsx')
             exel_file.adjust_column_lenght(f'{self.out_file_dir}/{dir}.xlsx', ['A'])
             exel_file.color_column(f'{self.out_file_dir}/{dir}.xlsx', ['E','H','J'], ['FFFF00','FFFF00','FFFF00'])
 
 
-    
+
 
 
 
@@ -293,6 +296,76 @@ class analisi:
     '''
     Classe con i metodi per l'analisi delle misure
     '''
+
+    def __init__(self, csv_data_directory):
+        '''
+        INPUT:
+            df = <pd.DataFrame>, dataframe con i dati della misura
+        '''
+        self.main_dir = csv_data_directory #salvataggio della directory principale
+        
+    
+
+    def average_values(self):
+        '''
+        Funzione che concatena i dataframe di tutte le misure
+        '''
+        import glob 
+        from os.path import exists
+
+        if not exists(self.main_dir + '/averaged_data.csv'):
+            
+
+            files_csv = glob.glob(self.main_dir + '/*.csv') #leggo solo i file con estensione csv
+            # print(files)
+
+            df_list = [] # lista dei dataframe che ci sono
+            
+            #creo il dataFrame pandas con i valori medi di tutte le misure
+            df_avg = pd.DataFrame(columns=['jobName','LeqA','LeqC','P+U peak'])
+
+
+            # salvo in un dataframe tutti i file csv
+            for file in files_csv:
+                # print(file)
+                df_list.append(pd.read_csv(file))
+            
+            # iterazione su tutti i dataframe
+            for df in df_list:
+                
+                fileIDs = df[df.columns[1]].unique() #lista dei fileID
+                
+                LeqA_mean = zeros(len(fileIDs)) # inizializzo l'array di LeqA_mean
+                LeqC_mean = zeros(len(fileIDs)) # inizializzo l'array di LeqC_mean
+                Upeak_mean = zeros(len(fileIDs)) # inizializzo l'array di LeqC_mean
+
+                for i in range(len(fileIDs)):
+                    idx = df[df.columns[1]] == fileIDs[i]
+                    LeqA_mean[i] = mean(df['LeqA_eq'][idx])
+                    LeqC_mean[i] = mean(df['LeqC_eq'][idx]) + std(df['LeqC_eq'][idx])
+                    Upeak_mean[i] = max(df['PeakC_max'][idx])
+                    # print(LeqA_mean)
+                
+                new_df = pd.DataFrame({'jobName': fileIDs ,'LeqA' : LeqA_mean, 'LeqC' : LeqC_mean ,'P+U peak' : Upeak_mean})
+                df_avg = pd.concat([df_avg,new_df], ignore_index=True)
+
+
+
+            files.write_csv(df_avg, self.main_dir + '/averaged_data.csv')
+            files.write_exel(df_avg, self.main_dir + '/averaged_data.xlsx')
+            exel_file.adjust_column_lenght(self.main_dir + '/averaged_data.xlsx', 'A')
+            return df_avg
+        else:
+            print('File averaged.csv already exists!')
+
+
+            
+
+
+        
+        
+
+        
 
         
 
@@ -303,8 +376,16 @@ class analisi:
 from os import chdir, getcwd
 chdir('/Users/theo/Desktop/Ermes/Misure')
 
-f = manager()
-f.iterate_directory()
+# f = manager() # inizializzazione delle directory e dei file
+# f.iterate_directory() #iterazione su tutte le cartelle contenenti i dati
+
+data_folder = '/Users/theo/Desktop/Ermes/Misure/data' 
+a = analisi(data_folder)
+df_avg = a.average_values()
+print(df_avg)
+
+
+
 
 # df = files.read_measure_file(file)
 # files.write_csv(df, '/Users/theo/Desktop/Ermes/test/prova.csv')
