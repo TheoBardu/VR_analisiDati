@@ -1,11 +1,8 @@
-#! /opt/anaconda3/bin/python3
-
-# This code is the main code for the analysis of the data from the VR acquisitions
-
 import pandas as pd
 import openpyxl as ex
 from openpyxl.styles import PatternFill
 from numpy import zeros, arange, mean, std, max
+from os import chdir, getcwd
 
 
 file = '/Users/theo/Desktop/Ermes/Misure/misF/misF/LSOURCES - Copia.txt'
@@ -360,37 +357,3 @@ class analisi:
 
 
             
-
-
-        
-        
-
-        
-
-        
-
-
-
-# MAIN Program
-
-from os import chdir, getcwd
-chdir('/Users/theo/Desktop/Ermes/Misure')
-
-# f = manager() # inizializzazione delle directory e dei file
-# f.iterate_directory() #iterazione su tutte le cartelle contenenti i dati
-
-data_folder = '/Users/theo/Desktop/Ermes/Misure/data' 
-a = analisi(data_folder)
-df_avg = a.average_values()
-print(df_avg)
-
-
-
-
-# df = files.read_measure_file(file)
-# files.write_csv(df, '/Users/theo/Desktop/Ermes/test/prova.csv')
-# files.write_exel(df, '/Users/theo/Desktop/Ermes/test/prova.xlsx')
-# exel_file.color_column('/Users/theo/Desktop/Ermes/test/prova.xlsx', ["E","F"], ['FFFF00','AFFA00'])
-
-
-
