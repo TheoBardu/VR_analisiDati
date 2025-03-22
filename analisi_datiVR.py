@@ -1,11 +1,11 @@
 import pandas as pd
 import openpyxl as ex
 from openpyxl.styles import PatternFill
-from numpy import zeros, arange, mean, std, max
+from numpy import zeros, arange, mean, std, max, round
 from os import chdir, getcwd
 
 
-file = '/Users/theo/Desktop/Ermes/Misure/misF/misF/LSOURCES - Copia.txt'
+# file = '/Users/theo/Desktop/Ermes/Misure/misF/misF/LSOURCES - Copia.txt'
 
 
 class exel_file:
@@ -59,17 +59,18 @@ class files:
     Classe che serve per leggere e scrivere i file
     '''
 
-    def read_measure_file(file):
+    def read_measure_file(file, letter_ID):
         '''
         Funzione che legge il file di misura in txt e restituisce un dataframe pandas.
 
         INPUT:
             file = <str>, directory del file da leggere
+            letter_ID = <str>, lettera della cartella dati (tipicamente D,E,F o W)
         OUTPUT:
             df = <pd.DataFrame>, dataframe contenente i dati della misura
         '''
 
-        df = pd.DataFrame(columns=['fileID','nTrack','LeqA_min','LeqA_max','LeqA_eq','LeqC_min','LeqC_max','LeqC_eq','PeakC_max','PeakC_eq','durata','inizio','fine'])
+        df = pd.DataFrame(columns=['fileID','letter_ID','nTrack','LeqA_min','LeqA_max','LeqA_eq','LeqC_min','LeqC_max','LeqC_eq','PeakC_max','PeakC_eq','durata','inizio','fine'])
         nFiles = 0 #numero di file nella misura
         
 
@@ -89,6 +90,7 @@ class files:
         # fine = zeros(nFiles)
         # nSorgenti = zeros(nFiles)
         fileIDs = []
+        letter_IDs = []
         inizio=[]
         fine = []
         nSorgenti = []
@@ -108,7 +110,7 @@ class files:
         durata = [] # durata della traccia
         
 
-        inxd_fileIDs = 0
+        inxd_letter_IDs = 0 # tengo conto del numero di misura (es: D1, D2, D3, ...)
         indx_inizio = 0
         indx_fine = 0
         indx = 0
@@ -119,7 +121,7 @@ class files:
                 # print(l)
                 # print(lines[indx])
                 # fileIDs[inxd_fileIDs] = l[1]
-                # inxd_fileIDs += 1
+                inxd_letter_IDs += 1
                 
                 l1 = lines[indx+1].split() # questa è la riga dell'inizio
                 
@@ -133,9 +135,12 @@ class files:
                 #itero sul numero di sorgenti
                 for i in range(len(ntracks)):
                     fileIDs.append(l0[1]) #creo tante copie del nome sorgente quante sono le sorgenti
+                    letter_IDs.append(letter_ID+str(inxd_letter_IDs)) #creo tante copie del letter ID  quante sono le sorgenti
                     inizio.append(l1[2]) # creo tante copie dell'inizio quante sono le sorgenti
                     fine.append(l2[2]) # creo tante copie della fine quante sono le sorgenti
                     nSorgenti.append(ntracks[i]+1) # creo un numero di sorgenti in ordine crescente
+
+                
 
                 #salvataggio livelli euqalizzati A e durata tracciati
                 l7 = lines[indx+7].split() #questa è la riga dei livelli LeqA
@@ -189,6 +194,7 @@ class files:
             
 
         df['fileID'] = fileIDs
+        df['letter_ID'] = letter_IDs
         df['inizio'] = inizio
         df['fine'] = fine
         df['nTrack'] = nSorgenti
@@ -269,8 +275,8 @@ class manager:
         '''
         from os import path, mkdir
         for dir in self.file_list:
-            print(f'Iterazione sulla directory: {dir}')
-            chdir(self.main_dir + '/' + dir + '/' + dir)
+            print(f'Iterazione sulla directory: {dir}') 
+            chdir(self.main_dir + '/' + dir + '/' + dir) 
 
             self.out_file_dir = self.main_dir + '/' + 'data'
             if path.isdir(self.out_file_dir) == False:
@@ -278,11 +284,11 @@ class manager:
             
         
 
-            df, num_of_track, n_files = files.read_measure_file(file_name)
+            df, num_of_track, n_files = files.read_measure_file(file_name,list(dir)[-1])
             files.write_csv(df, f'{self.out_file_dir}/{dir}.csv')
             files.write_exel(df, f'{self.out_file_dir}/{dir}.xlsx')
             exel_file.adjust_column_lenght(f'{self.out_file_dir}/{dir}.xlsx', ['A'])
-            exel_file.color_column(f'{self.out_file_dir}/{dir}.xlsx', ['E','H','J'], ['FFFF00','FFFF00','FFFF00'])
+            exel_file.color_column(f'{self.out_file_dir}/{dir}.xlsx', ['F','I','K'], ['FFFF00','FFFF00','FFFF00'])
 
 
 
@@ -301,7 +307,9 @@ class analisi:
         '''
         self.main_dir = csv_data_directory #salvataggio della directory principale
         
-    
+
+
+
 
     def average_values(self):
         '''
@@ -318,8 +326,8 @@ class analisi:
 
             df_list = [] # lista dei dataframe che ci sono
             
-            #creo il dataFrame pandas con i valori medi di tutte le misure
-            df_avg = pd.DataFrame(columns=['jobName','LeqA','LeqC','P+U peak'])
+            #inizializzo il dataFrame pandas con i valori medi di tutte le misure
+            df_avg = pd.DataFrame(columns=['jobName', 'ID', 'U' ,'LeqA','LeqC','Ppeak'])
 
 
             # salvo in un dataframe tutti i file csv
@@ -331,19 +339,33 @@ class analisi:
             for df in df_list:
                 
                 fileIDs = df[df.columns[1]].unique() #lista dei fileID
+                letter_IDs = df[df.columns[2]].unique() #lista dei letterID
                 
                 LeqA_mean = zeros(len(fileIDs)) # inizializzo l'array di LeqA_mean
                 LeqC_mean = zeros(len(fileIDs)) # inizializzo l'array di LeqC_mean
-                Upeak_mean = zeros(len(fileIDs)) # inizializzo l'array di LeqC_mean
+                Ppeak_mean = zeros(len(fileIDs)) # inizializzo l'array di LeqC_mean
+                U_sdom = zeros(len(fileIDs)) #standard deviation of mean (incertezza misure)
+
 
                 for i in range(len(fileIDs)):
-                    idx = df[df.columns[1]] == fileIDs[i]
-                    LeqA_mean[i] = mean(df['LeqA_eq'][idx])
-                    LeqC_mean[i] = mean(df['LeqC_eq'][idx]) + std(df['LeqC_eq'][idx])
-                    Upeak_mean[i] = max(df['PeakC_max'][idx])
+                    idx = df[df.columns[1]] == fileIDs[i] # prendo solo i valori opportuni
+                    
+                    #calcolo i valori medi
+                    LeqA_mean[i] = round(mean(df['LeqA_eq'][idx]),1)
+                    LeqC_mean[i] = round(mean(df['LeqC_eq'][idx]) + std(df['LeqC_eq'][idx],ddof=1),1)
+                    Ppeak_mean[i] = round(max(df['PeakC_max'][idx]) + 1.56,1)
                     # print(LeqA_mean)
+                    
+                    #calcolo l'incertezza sulla misura LeqA (SDOM)
+                    U_sdom[i] = round(std(df['LeqA_eq'][idx], ddof=1),1)
+
                 
-                new_df = pd.DataFrame({'jobName': fileIDs ,'LeqA' : LeqA_mean, 'LeqC' : LeqC_mean ,'P+U peak' : Upeak_mean})
+                new_df = pd.DataFrame({'jobName': fileIDs ,
+                                       'ID':letter_IDs ,
+                                       'U':U_sdom,
+                                       'LeqA' : LeqA_mean, 
+                                       'LeqC' : LeqC_mean ,
+                                       'Ppeak' : Ppeak_mean})
                 df_avg = pd.concat([df_avg,new_df], ignore_index=True)
 
 

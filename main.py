@@ -7,10 +7,22 @@ from analisi_datiVR import manager, analisi
 
 chdir('/Users/theo/Desktop/Ermes/Misure')
 
-# f = manager() # inizializzazione delle directory e dei file
-# f.iterate_directory() #iterazione su tutte le cartelle contenenti i dati
+
+# ==========================================================================
+# Inizializzazione: lettura file e creazione tabelle =====================================
+
+f = manager() # inizializzazione delle directory e dei file
+f.iterate_directory() #iterazione su tutte le cartelle contenenti i dati .txt per salvare xls e csv
+# ==========================================================================
+
+# ==========================================================================
+# analisi dei dati acquisiti =====================================
 
 data_folder = '/Users/theo/Desktop/Ermes/Misure/data' 
 a = analisi(data_folder)
 df_avg = a.average_values()
-print(df_avg)
+# print(df_avg)
+
+# ==========================================================================
+
+
