@@ -1,7 +1,7 @@
 import pandas as pd
 import openpyxl as ex
 from openpyxl.styles import PatternFill
-from numpy import zeros, arange, mean, std, max, round
+from numpy import zeros, arange, mean, std, max, round, ones, log10, sum, dot
 from os import chdir, getcwd
 
 
@@ -20,7 +20,7 @@ class exel_file:
         INPUT:
             file_path = <str>, percorso del file Excel
             column_letter = <list str>, lettera della colonna da colorare (es. 'A', 'B', ecc.)
-            color = <str>, colore in formato esadecimale (es. 'FFFF00' per il giallo)
+            color = < list str>, colore in formato esadecimale (es. 'FFFF00' per il giallo)
         '''
         wb = ex.load_workbook(file_path) #carica il file exel
         ws = wb.active #seleziona il fogio attivo 
@@ -292,9 +292,6 @@ class manager:
 
 
 
-
-
-
 class analisi:
     '''
     Classe con i metodi per l'analisi delle misure
@@ -310,10 +307,10 @@ class analisi:
 
 
 
-
     def average_values(self):
         '''
-        Funzione che concatena i dataframe di tutte le misure
+        Funzione che concatena i dataframe di tutte le misure e scrive un file completo con le medie
+        e le std sulla media (incertezze)
         '''
         import glob 
         from os.path import exists
@@ -345,6 +342,7 @@ class analisi:
                 LeqC_mean = zeros(len(fileIDs)) # inizializzo l'array di LeqC_mean
                 Ppeak_mean = zeros(len(fileIDs)) # inizializzo l'array di LeqC_mean
                 U_sdom = zeros(len(fileIDs)) #standard deviation of mean (incertezza misure)
+                exposure_time  = 10*ones(len(fileIDs)) # tempo di esposizione del lavoratore
 
 
                 for i in range(len(fileIDs)):
@@ -365,7 +363,8 @@ class analisi:
                                        'U':U_sdom,
                                        'LeqA' : LeqA_mean, 
                                        'LeqC' : LeqC_mean ,
-                                       'Ppeak' : Ppeak_mean})
+                                       'Ppeak' : Ppeak_mean,
+                                       'Ti': exposure_time})
                 df_avg = pd.concat([df_avg,new_df], ignore_index=True)
 
 
@@ -376,6 +375,38 @@ class analisi:
             return df_avg
         else:
             print('File averaged.csv already exists!')
-
-
+            df_avg = pd.read_csv(self.main_dir + '/averaged_data.csv')
+            return df_avg
             
+
+
+    def calcolo_Leq8h(self, df_avg, T0 = 8):
+        '''
+        funzione che calcola il livello equivalente nelle 8h
+        INPUT:
+            df_avg = <dataFrame>, contenente i valori medi delle misure
+            T0 = <int>, numero di ore di esposizione di una giornata lavorativa
+        
+        Theory:
+        livello sonoro equivalente 8h
+        Lex,8h = 10*log( 1/T0 * sum( T_i * 10^(0.1 * L_i)  )    (dBA)
+            
+            La i indica la sorgente sonora i_esima
+            T0 è il tempo totale di lavoro in ore (8 h lavorative in genere)
+            T_i è il tempo di esposizione quotidiana, in ore, di un lavoratore alla fonte i-esima
+            L_i è il livello equivalente continuo ponderato A della fonte i-esima
+        '''
+
+        # Calcolo il Leq_8h
+        LeqA_8h = 10 * log10( 1/T0 * dot( df_avg['Ti'], 10**(0.1 * df_avg['LeqA']) ) )
+        return df_avg
+        
+
+
+
+
+        
+
+
+
+         
