@@ -7,6 +7,7 @@ from os import chdir, getcwd
 
 # file = '/Users/theo/Desktop/Ermes/Misure/misF/misF/LSOURCES - Copia.txt'
 
+        
 
 class exel_file:
     '''
@@ -271,7 +272,7 @@ class manager:
     def iterate_directory(self,file_name = 'LSOURCES - Copia.txt'):
         '''
         Funzione che itera su tutte le directory per salvare i file.
-        Crea i file csv e xlsx e colora le colonne opportune del file xlsx.
+        Crea i file csv e xlsx e colora le colonne opportune del file xlsx mediando tutti i dati.
         '''
         from os import path, mkdir
         for dir in self.file_list:
@@ -290,6 +291,17 @@ class manager:
             exel_file.adjust_column_lenght(f'{self.out_file_dir}/{dir}.xlsx', ['A'])
             exel_file.color_column(f'{self.out_file_dir}/{dir}.xlsx', ['F','I','K'], ['FFFF00','FFFF00','FFFF00'])
 
+
+    def VR_8h(self):
+        '''
+        Funzione che analizza i dati avg per restituire i valori nelle 8h.
+        NB: è importante aver modificato il file avergaed_data.xlsx in modo da aver inserito
+        il numero identificativo del gruppo omogeneo e il tempo di esposizione della mansione
+        '''
+        
+
+        
+    
 
 
 class analisi:
@@ -342,8 +354,8 @@ class analisi:
                 LeqC_mean = zeros(len(fileIDs)) # inizializzo l'array di LeqC_mean
                 Ppeak_mean = zeros(len(fileIDs)) # inizializzo l'array di LeqC_mean
                 U_sdom = zeros(len(fileIDs)) #standard deviation of mean (incertezza misure)
-                exposure_time  = 10*ones(len(fileIDs)) # tempo di esposizione del lavoratore
-
+                exposure_time  = 10*ones(len(fileIDs)) # tempo di esposizione del lavoratore in minuti
+                GrOm = 1*ones(len(fileIDs)) # creo a colonna che conterrà l'identificativo (numero intero) del gruppo omogeneo
 
                 for i in range(len(fileIDs)):
                     idx = df[df.columns[1]] == fileIDs[i] # prendo solo i valori opportuni
@@ -363,15 +375,17 @@ class analisi:
                                        'U':U_sdom,
                                        'LeqA' : LeqA_mean, 
                                        'LeqC' : LeqC_mean ,
-                                       'Ppeak' : Ppeak_mean,
-                                       'Ti': exposure_time})
+                                       'Ppeak' : Ppeak_mean})
                 df_avg = pd.concat([df_avg,new_df], ignore_index=True)
 
+            df_avg['Ti'] = exposure_time #creo la colonna con i valori di exposure time
+            df_avg['GrOm'] = GrOm #creo la colonna con gli ID del gruppo omogeneo
 
 
             files.write_csv(df_avg, self.main_dir + '/averaged_data.csv')
             files.write_exel(df_avg, self.main_dir + '/averaged_data.xlsx')
             exel_file.adjust_column_lenght(self.main_dir + '/averaged_data.xlsx', 'A')
+            print('Averaged data files created')
             return df_avg
         else:
             print('File averaged.csv already exists!')
@@ -380,12 +394,15 @@ class analisi:
             
 
 
-    def calcolo_Leq8h(self, df_avg, T0 = 8):
+    def calcolo_Leq8h(self, df_GrOm, T0 = 480):
         '''
         funzione che calcola il livello equivalente nelle 8h
         INPUT:
-            df_avg = <dataFrame>, contenente i valori medi delle misure
-            T0 = <int>, numero di ore di esposizione di una giornata lavorativa
+            df_GrOm = <dataFrame>, contenente i valori medi delle misure di uno specifico gruppo omogeneo
+            T0 = <int>, numero di minuti di esposizione di una giornata lavorativa
+        OUTPUT:
+            df_avg = <dataFrame> specifico della mansione
+        
         
         Theory:
         livello sonoro equivalente 8h
@@ -398,8 +415,37 @@ class analisi:
         '''
 
         # Calcolo il Leq_8h
-        LeqA_8h = 10 * log10( 1/T0 * dot( df_avg['Ti'], 10**(0.1 * df_avg['LeqA']) ) )
-        return df_avg
+        self.LeqA_8h = 10 * log10( 1/T0 * dot( df_GrOm['Ti'], 10**(0.1 * df_GrOm['LeqA']) ) )
+        return self.LeqA_8h
+    
+
+    def calcolo_U_estesa(self, df_GrOm, T0 = 480, u2m = 0.7, u_pos = 1):
+        '''
+        Funzione che calcola l'incertezza combinata standard e quella estesa per il LeqA_8h
+        INPUT:
+            df_GrOm = <dataFrame>, contenente i valori medi delle misure di uno specifico gruppo omogeneo
+            T0 = <int>, minuti di esposizione di una giornata lavorativa, in genere 8 ore ossia 480 minuti
+            u2m = <float>, errore secondo normativa in base allo strumento (0.7 o 1.5)
+            u_pos = <float>, errore nel posizionamento dello strumento (in metri)
+        OUTPUT:
+            U_estesa = <float>, incertezza estesa
+            U_comb_std = <float>, iincertezza combinata standard
+
+        THEORY:
+
+        '''
+
+        self.U_comb_std = sum(  (df_GrOm['Ti']/T0  * 10**(0.1*( df_GrOm['LeqA'] - self.LeqA_8h ) ) )**2   * ( df_GrOm['U']**2 + u2m**2 + u_pos **2 ) +
+                    ( 4.34 * (1/T0  * 10**(0.1*( df_GrOm['LeqA'] - self.LeqA_8h ) )) * std(df_GrOm['Ti'], ddof=1) )**2 )
+        
+        self.U_ext = self.U_comb_std * 1.65
+
+        return self.U_ext, self.U_comb_std
+
+        
+
+
+
         
 
 

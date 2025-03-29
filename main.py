@@ -20,8 +20,15 @@ f.iterate_directory() #iterazione su tutte le cartelle contenenti i dati .txt pe
 
 data_folder = '/Users/theo/Desktop/Ermes/Misure/data' 
 a = analisi(data_folder)
-df_avg = a.average_values()
+df_avg = a.average_values() #creazione delle medie delle misure
 # print(df_avg)
+
+input('!!!! Prima di Proseguire:\n'
+'Controlla il file averaged_data.xlsx e inserisci a mano i Ti e i GrOm.\n'
+'Poi premi invio per continuare con il codice...')
+
+
+
 
 # ==========================================================================
 
