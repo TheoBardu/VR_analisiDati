@@ -219,6 +219,7 @@ class files:
         Funzione che scrive il dataframe df in un file csv
         '''
         df.to_csv(file)
+        print('Salvataggio in csv del file completato')
 
 
     def write_exel(df, file):
@@ -226,12 +227,13 @@ class files:
         Funzione che scrive il dataframe df df in un file excel
         '''
         df.to_excel(file, index=False)
+        print('Salvataggio del file exel completato')
         
 
 
     def read_csv(file):
         '''
-        Funzione che legge il file csv grezzo e lo trasforma nel file txt measure file
+        Funzione che legge il file csv grezzo e lo trasforma in un dataFrame Pandas
         '''
         df = pd.read_csv(file) 
 
@@ -292,14 +294,9 @@ class manager:
             exel_file.color_column(f'{self.out_file_dir}/{dir}.xlsx', ['F','I','K'], ['FFFF00','FFFF00','FFFF00'])
 
 
-    def VR_8h(self):
-        '''
-        Funzione che analizza i dati avg per restituire i valori nelle 8h.
-        NB: è importante aver modificato il file avergaed_data.xlsx in modo da aver inserito
-        il numero identificativo del gruppo omogeneo e il tempo di esposizione della mansione
-        '''
         
 
+        
         
     
 
@@ -354,8 +351,7 @@ class analisi:
                 LeqC_mean = zeros(len(fileIDs)) # inizializzo l'array di LeqC_mean
                 Ppeak_mean = zeros(len(fileIDs)) # inizializzo l'array di LeqC_mean
                 U_sdom = zeros(len(fileIDs)) #standard deviation of mean (incertezza misure)
-                exposure_time  = 10*ones(len(fileIDs)) # tempo di esposizione del lavoratore in minuti
-                GrOm = 1*ones(len(fileIDs)) # creo a colonna che conterrà l'identificativo (numero intero) del gruppo omogeneo
+                
 
                 for i in range(len(fileIDs)):
                     idx = df[df.columns[1]] == fileIDs[i] # prendo solo i valori opportuni
@@ -377,9 +373,10 @@ class analisi:
                                        'LeqC' : LeqC_mean ,
                                        'Ppeak' : Ppeak_mean})
                 df_avg = pd.concat([df_avg,new_df], ignore_index=True)
-
-            df_avg['Ti'] = exposure_time #creo la colonna con i valori di exposure time
-            df_avg['GrOm'] = GrOm #creo la colonna con gli ID del gruppo omogeneo
+            
+            
+            df_avg['Ti'] = [10] * len(df_avg) #creo la colonna con i valori di exposure time
+            df_avg['GrOm'] = [1] * len(df_avg) #creo la colonna con gli ID del gruppo omogeneo
 
 
             files.write_csv(df_avg, self.main_dir + '/averaged_data.csv')
@@ -434,14 +431,65 @@ class analisi:
         THEORY:
 
         '''
-
-        self.U_comb_std = sum(  (df_GrOm['Ti']/T0  * 10**(0.1*( df_GrOm['LeqA'] - self.LeqA_8h ) ) )**2   * ( df_GrOm['U']**2 + u2m**2 + u_pos **2 ) +
-                    ( 4.34 * (1/T0  * 10**(0.1*( df_GrOm['LeqA'] - self.LeqA_8h ) )) * std(df_GrOm['Ti'], ddof=1) )**2 )
+        LeqA8H = self.calcolo_Leq8h( df_GrOm)
+        self.U_comb_std = sum(  (df_GrOm['Ti']/T0  * 10**(0.1*( df_GrOm['LeqA'] - LeqA8H ) ) )**2   * ( df_GrOm['U']**2 + u2m**2 + u_pos **2 ) +
+                    ( 4.34 * (1/T0  * 10**(0.1*( df_GrOm['LeqA'] - LeqA8H ) )) * std(df_GrOm['Ti'], ddof=1) )**2 )
         
         self.U_ext = self.U_comb_std * 1.65
 
         return self.U_ext, self.U_comb_std
 
+
+    def VR_8h(self,df_avg_dir):
+            '''
+            Funzione che analizza i dati avg per restituire i valori nelle 8h.
+            NB: è importante aver modificato il file avergaed_data.xlsx in modo da aver inserito
+            il numero identificativo del gruppo omogeneo e il tempo di esposizione della mansione
+            INPUT:
+                df_avg_dir = <str>, directory del file con la media dei valori
+            OUTPUT:
+                df_VR8h = <dataFrame>, con i valori di valutazione del rischio in 8h
+            '''
+            df_avg = files.read_csv(df_avg_dir) #lettura del df
+
+            #creo le variabili vuote del dataframe da inserire 
+            LeqA8h = []
+            Uext = []
+            U_comb_std = []
+            Peak_max = []
+
+            #prendo solo i valori unici degli ID del gruppo omogeneo
+            grorIDs = df_avg['GrOm'].unique() # ; print(grorIDs)
+
+            #inizio il ciclo su tutti i valori di ID del gruppo omogeneo
+            for i in range(len(grorIDs)):
+                print('Calcolo su gruppo omogenero:', grorIDs[i]) 
+
+                idx = df_avg['GrOm'] == grorIDs[i] # prendo solo i valori opportuni di GrOm e gl indici
+                
+                #calcolo il LeqA su 8 ore
+                ax1 = self.calcolo_Leq8h(df_GrOm=df_avg[idx]) 
+                LeqA8h.append(ax1)
+
+                #calcolo incertezza estesa
+                ax2, ax22 = self.calcolo_U_estesa(df_GrOm=df_avg[idx])
+                Uext.append(ax2), U_comb_std.append(ax22)
+                
+                #Calcolo massimo del picco
+                ax3 = max(df_avg['Ppeak'][idx])
+                Peak_max.append(ax3)
+
+                # input('--- pausa ---')
+            
+            # df_VR8h = pd.DataFrame(columns=['GrOm','LeqA', 'U' , 'Ppeak'])
+            df_VR8h = pd.DataFrame({'GrOm': grorIDs,
+                                    'LeqA_8h': LeqA8h,
+                                    'Peak': Peak_max,
+                                    'U_ext': Uext,})
+            files.write_exel(df_VR8h, self.main_dir+ '/VR_8h.xlsx')
+            files.write_csv(df_VR8h, self.main_dir+ '/VR_8h.csv')
+            print(df_VR8h)
+            print('Vautazione rischio 8h completata.')
         
 
 

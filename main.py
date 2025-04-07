@@ -5,31 +5,43 @@
 from os import chdir, getcwd
 from analisi_datiVR import manager, analisi
 
-chdir('/Users/theo/Desktop/Ermes/Misure')
+main_directory = '/Users/theo/Desktop/Ermes/Misure'
+chdir(main_directory)
+
+
 
 
 # ==========================================================================
 # Inizializzazione: lettura file e creazione tabelle =====================================
 
-f = manager() # inizializzazione delle directory e dei file
-f.iterate_directory() #iterazione su tutte le cartelle contenenti i dati .txt per salvare xls e csv
+m = manager() # inizializzazione delle directory e dei file
+m.iterate_directory() #iterazione su tutte le cartelle contenenti i dati .txt per salvare xls e csv
 # ==========================================================================
 
 # ==========================================================================
 # analisi dei dati acquisiti =====================================
 
-data_folder = '/Users/theo/Desktop/Ermes/Misure/data' 
+data_folder = main_directory + '/data' 
 a = analisi(data_folder)
 df_avg = a.average_values() #creazione delle medie delle misure
-# print(df_avg)
+# # print(df_avg)
 
-input('!!!! Prima di Proseguire:\n'
-'Controlla il file averaged_data.xlsx e inserisci a mano i Ti e i GrOm.\n'
-'Poi premi invio per continuare con il codice...')
 
+str_print_4input = '''
+§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§
+!! -> Prima di Proseguire:\n
+Controlla il file averaged_data.xlsx e inserisci a mano i Ti e i GrOm.\n
+Poi premi invio per continuare con il codice...
+Puoi anche selezionare direttamente questa parte per continuare se hai interrotto il codice.\n
+§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§
+'''
+input(str_print_4input)
 
 
 
 # ==========================================================================
+# Valutazione Rischio 8 h =====================================
+a.VR_8h(data_folder + '/averaged_data.csv')
+
 
 
