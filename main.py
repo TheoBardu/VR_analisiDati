@@ -5,7 +5,8 @@
 from os import chdir, getcwd
 from analisi_datiVR import manager, analisi
 
-main_directory = '/Users/theo/Desktop/Ermes/Misure'
+main_directory = '/Users/theo/Desktop/Ermes/test/dati_test/misure'
+#/Users/theo/Desktop/Ermes/Misure
 chdir(main_directory)
 
 
@@ -30,7 +31,7 @@ df_avg = a.average_values() #creazione delle medie delle misure
 str_print_4input = '''
 §§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§
 !! -> Prima di Proseguire:\n
-Controlla il file averaged_data.xlsx e inserisci a mano i Ti e i GrOm.\n
+Controlla il file averaged_data.csv e inserisci a mano i Ti e i GrOm.\n
 Poi premi invio per continuare con il codice...
 Puoi anche selezionare direttamente questa parte per continuare se hai interrotto il codice.\n
 §§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§

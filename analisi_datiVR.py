@@ -146,49 +146,25 @@ class files:
                 #salvataggio livelli euqalizzati A e durata tracciati
                 l7 = lines[indx+7].split() #questa è la riga dei livelli LeqA
                 # print(l7)
-                LeqA_min.append(float(l7[5])); durata.append(l7[8])
-                LeqA_min.append(float(l7[9])); durata.append(l7[12])
-                LeqA_min.append(float(l7[13])); durata.append(l7[16])
-                
-                LeqA_max.append(float(l7[6]))
-                LeqA_max.append(float(l7[10]))
-                LeqA_max.append(float(l7[14]))
-
-                LeqA_eq.append(float(l7[7]))
-                LeqA_eq.append(float(l7[11]))
-                LeqA_eq.append(float(l7[15]))
-
-
+                for n in range(len(ntracks)):
+                    LeqA_min.append(float(l7[5 + (n * 4)])); durata.append(l7[8 + (n*4)])
+                    LeqA_max.append(float(l7[6 + (n * 4)]))
+                    LeqA_eq.append(float(l7[7 + (n * 4)]))
+        
                 # salvataggio livelli equalizzati C
                 l8 = lines[indx+8].split() #questa è la riga dei livelli C
                 # print(l8)
-                LeqC_min.append(float(l8[5]))
-                LeqC_min.append(float(l8[9]))
-                LeqC_min.append(float(l8[13])) 
-
-                LeqC_max.append(float(l8[6]))
-                LeqC_max.append(float(l8[10]))
-                LeqC_max.append(float(l8[14]))
-
-                LeqC_eq.append(float(l8[7]))
-                LeqC_eq.append(float(l8[11]))
-                LeqC_eq.append(float(l8[15]))  
+                for n in range(len(ntracks)):
+                    LeqC_min.append(float(l8[5 + (n * 4)]))
+                    LeqC_max.append(float(l8[6 + (n * 4)]))
+                    LeqC_eq.append(float(l8[7 + (n * 4)]))
 
                 #salvataggio picchi C
                 l9 = lines[indx+9].split()
                 # print(l9)
-                PeakC_max.append(float(l9[5]))
-                PeakC_max.append(float(l9[8]))
-                PeakC_max.append(float(l9[11]))
-
-                PeakC_eq.append(float(l9[6]))
-                PeakC_eq.append(float(l9[9]))
-                PeakC_eq.append(float(l9[12]))
-
-
-
-
-
+                for n in range(len(ntracks)):
+                    PeakC_max.append(float(l9[5 + (n * 3)]))
+                    PeakC_eq.append(float(l9[6 + (n * 3)]))
             
             indx += 1
 
@@ -271,7 +247,7 @@ class manager:
         print(f'Lista dei file nella directory: {self.file_list}') # stampa la lista dei file nella directory principale
 
 
-    def iterate_directory(self,file_name = 'LSOURCES - Copia.txt'):
+    def iterate_directory(self,file_name = 'LSOURCES.txt'):
         '''
         Funzione che itera su tutte le directory per salvare i file.
         Crea i file csv e xlsx e colora le colonne opportune del file xlsx mediando tutti i dati.
@@ -450,7 +426,7 @@ class analisi:
             OUTPUT:
                 df_VR8h = <dataFrame>, con i valori di valutazione del rischio in 8h
             '''
-            df_avg = files.read_csv(df_avg_dir) #lettura del df
+            df_avg = files.read_csv(df_avg_dir) #lettura del df in csv
 
             #creo le variabili vuote del dataframe da inserire 
             LeqA8h = []
