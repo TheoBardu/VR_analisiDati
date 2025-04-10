@@ -42,7 +42,9 @@ input(str_print_4input)
 
 # ==========================================================================
 # Valutazione Rischio 8 h =====================================
-a.VR_8h(data_folder + '/averaged_data.csv')
+# a.VR_8h(data_folder + '/averaged_data.csv')
+m.VR8h_exel(data_folder + '/averaged_data.csv', main_directory + '/VR_8h.xlsx')
+
 
 
 

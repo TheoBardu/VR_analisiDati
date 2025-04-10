@@ -1,8 +1,8 @@
 import pandas as pd
 import openpyxl as ex
 from openpyxl.styles import PatternFill
-from numpy import zeros, arange, mean, std, max, round, ones, log10, sum, dot
-from os import chdir, getcwd
+from numpy import zeros, arange, mean, std, max, round, ones, log10, sum, dot, sqrt
+from os import chdir, getcwd, error
 
 
 # file = '/Users/theo/Desktop/Ermes/Misure/misF/misF/LSOURCES - Copia.txt'
@@ -54,6 +54,57 @@ class exel_file:
 
             ws.column_dimensions[letter].width = max_lenght
             wb.save(file_path)
+
+
+    def color_cell_VR8h(file_path, column_names = ['Peak', 'Leq_max','GrOm'], colors = ['e8643c','e8bd3c', '18AB49']):
+        '''
+        Funzione che colora la cella del file in maniera opportuna in base al rischio
+        'e8643c','e8bd3c', '18AB49' : rosso, giallo, verde
+        '''
+        wb = ex.load_workbook(file_path) #carica il file exel
+        ws = wb.active #seleziona il fogio attivo 
+        
+        #trovo l'indice delle colonne
+        col = {}
+        for cell in ws[1]:
+            if cell.value in column_names:
+                col[cell.value] = cell.column
+        
+
+
+
+        # itero sul numero di righe per colorare le celle
+        for i in range(2 , ws.max_row + 1):
+        
+            #rischio basso
+            if ws.cell(row=i, column = col[column_names[1]]).value <= 80.0 and ws.cell(row=i, column = col[column_names[0]]).value <= 135.0:
+                #creo il settaggio del riempimento verde
+                fill = PatternFill(start_color=colors[2], end_color=colors[2], fill_type="solid")
+                ws.cell(row=i,column= col[column_names[2]]).fill = fill
+            
+            #rischio medio
+            if ws.cell(row=i, column = col[column_names[1]]).value > 80.0 and ws.cell(row=i, column = col[column_names[1]]).value <= 85.0 and ws.cell(row=i, column = col[column_names[0]]).value > 135.0 and ws.cell(row=i, column = col[column_names[0]]).value <= 137.0:
+                #creo il settaggio del riempimento giallo
+                fill = PatternFill(start_color=colors[1], end_color=colors[1], fill_type="solid")
+                ws.cell(row=i,column= col[column_names[2]]).fill = fill
+            
+            #rischio alto
+            if ws.cell(row=i, column = col[column_names[1]]).value > 85.0 and ws.cell(row=i, column = col[column_names[1]]).value <= 87.0 and ws.cell(row=i, column = col[column_names[0]]).value > 137.0 and ws.cell(row=i, column = col[column_names[0]]).value <= 140.0:
+                #creo il settaggio del riempimento giallo
+                fill = PatternFill(start_color=colors[0], end_color=colors[0], fill_type="solid")
+                ws.cell(row=i,column= col[column_names[2]]).fill = fill
+            
+            #rischio fuori scala (Warning)
+            if ws.cell(row=i, column = col[column_names[1]]).value > 87 and ws.cell(row=i, column = col[column_names[0]]).value > 140.0:
+                error('@@@ Attenzione @@@\nPossibile errore nel calcolo oppure valore rumore troppo alto!')
+
+
+        
+        
+        
+        wb.save(file_path)
+
+
 
 class files:
     '''
@@ -147,24 +198,24 @@ class files:
                 l7 = lines[indx+7].split() #questa è la riga dei livelli LeqA
                 # print(l7)
                 for n in range(len(ntracks)):
-                    LeqA_min.append(float(l7[5 + (n * 4)])); durata.append(l7[8 + (n*4)])
-                    LeqA_max.append(float(l7[6 + (n * 4)]))
+                    LeqA_max.append(float(l7[5 + (n * 4)])); durata.append(l7[8 + (n*4)])
+                    LeqA_min.append(float(l7[6 + (n * 4)]))
                     LeqA_eq.append(float(l7[7 + (n * 4)]))
         
                 # salvataggio livelli equalizzati C
                 l8 = lines[indx+8].split() #questa è la riga dei livelli C
                 # print(l8)
                 for n in range(len(ntracks)):
-                    LeqC_min.append(float(l8[5 + (n * 4)]))
-                    LeqC_max.append(float(l8[6 + (n * 4)]))
+                    LeqC_max.append(float(l8[5 + (n * 4)]))
+                    LeqC_min.append(float(l8[6 + (n * 4)]))
                     LeqC_eq.append(float(l8[7 + (n * 4)]))
 
                 #salvataggio picchi C
                 l9 = lines[indx+9].split()
                 # print(l9)
                 for n in range(len(ntracks)):
-                    PeakC_max.append(float(l9[5 + (n * 3)]))
-                    PeakC_eq.append(float(l9[6 + (n * 3)]))
+                    PeakC_eq.append(float(l9[5 + (n * 3)]))
+                    PeakC_max.append(float(l9[6 + (n * 3)]))
             
             indx += 1
 
@@ -244,6 +295,11 @@ class manager:
         if "data" in self.file_list:
             self.file_list.remove("data")
         
+        if "VR_8h.csv" in self.file_list and "VR_8h.xlsx" in self.file_list:
+            self.file_list.remove("VR_8h.csv")
+            self.file_list.remove("VR_8h.xlsx")
+
+        
         print(f'Lista dei file nella directory: {self.file_list}') # stampa la lista dei file nella directory principale
 
 
@@ -269,7 +325,14 @@ class manager:
             exel_file.adjust_column_lenght(f'{self.out_file_dir}/{dir}.xlsx', ['A'])
             exel_file.color_column(f'{self.out_file_dir}/{dir}.xlsx', ['F','I','K'], ['FFFF00','FFFF00','FFFF00'])
 
-
+    def VR8h_exel(self, name_averaged_data, out_VR8h_name):
+        '''
+        Funzione che gestisce il file finale della valutazione del rischio in 8h dei lavori. 
+        Importa il file xlsx e ne colora le colonne del colore specifico in base al grado di rischio.
+        '''
+        a = analisi(self.main_dir)
+        a.VR_8h(name_averaged_data)
+        exel_file.color_cell_VR8h(out_VR8h_name)
         
 
         
@@ -333,13 +396,13 @@ class analisi:
                     idx = df[df.columns[1]] == fileIDs[i] # prendo solo i valori opportuni
                     
                     #calcolo i valori medi
-                    LeqA_mean[i] = round(mean(df['LeqA_eq'][idx]),1)
-                    LeqC_mean[i] = round(mean(df['LeqC_eq'][idx]) + std(df['LeqC_eq'][idx],ddof=1),1)
+                    LeqA_mean[i] = round(mean(df['LeqA_max'][idx]),1)
+                    LeqC_mean[i] = round(mean(df['LeqC_max'][idx]) + std(df['LeqC_max'][idx],ddof=1),1)
                     Ppeak_mean[i] = round(max(df['PeakC_max'][idx]) + 1.56,1)
                     # print(LeqA_mean)
                     
                     #calcolo l'incertezza sulla misura LeqA (SDOM)
-                    U_sdom[i] = round(std(df['LeqA_eq'][idx], ddof=1),1)
+                    U_sdom[i] = round(std(df['LeqA_max'][idx], ddof=1) * sqrt(1/sum(idx)),1)
 
                 
                 new_df = pd.DataFrame({'jobName': fileIDs ,
@@ -407,9 +470,9 @@ class analisi:
         THEORY:
 
         '''
-        LeqA8H = self.calcolo_Leq8h( df_GrOm)
+        LeqA8H = self.calcolo_Leq8h(df_GrOm, T0=T0)
         self.U_comb_std = sum(  (df_GrOm['Ti']/T0  * 10**(0.1*( df_GrOm['LeqA'] - LeqA8H ) ) )**2   * ( df_GrOm['U']**2 + u2m**2 + u_pos **2 ) +
-                    ( 4.34 * (1/T0  * 10**(0.1*( df_GrOm['LeqA'] - LeqA8H ) )) * std(df_GrOm['Ti'], ddof=1) )**2 )
+                    ( 4.34 * (1/T0  * 10**(0.1*( df_GrOm['LeqA'] - LeqA8H ) )) * (std(df_GrOm['Ti'], ddof=1) * sqrt(1/len(df_GrOm)) ) )**2 )
         
         self.U_ext = self.U_comb_std * 1.65
 
@@ -433,6 +496,7 @@ class analisi:
             Uext = []
             U_comb_std = []
             Peak_max = []
+            LeqA_max = []
 
             #prendo solo i valori unici degli ID del gruppo omogeneo
             grorIDs = df_avg['GrOm'].unique() # ; print(grorIDs)
@@ -455,13 +519,18 @@ class analisi:
                 ax3 = max(df_avg['Ppeak'][idx])
                 Peak_max.append(ax3)
 
+                #Calcolo il massimo di LeqA
+                LeqA_max.append(ax1 + ax2)
+
                 # input('--- pausa ---')
             
             # df_VR8h = pd.DataFrame(columns=['GrOm','LeqA', 'U' , 'Ppeak'])
             df_VR8h = pd.DataFrame({'GrOm': grorIDs,
-                                    'LeqA_8h': LeqA8h,
-                                    'Peak': Peak_max,
-                                    'U_ext': Uext,})
+                                    'LeqA_8h': round(LeqA8h,1),
+                                    'Peak': round(Peak_max,1),
+                                    'U_ext': round(Uext,1),
+                                    'Leq_max': round(LeqA_max,1)})
+
             files.write_exel(df_VR8h, self.main_dir+ '/VR_8h.xlsx')
             files.write_csv(df_VR8h, self.main_dir+ '/VR_8h.csv')
             print(df_VR8h)
