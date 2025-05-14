@@ -5,7 +5,7 @@
 from os import chdir, getcwd
 from analisi_datiVR import manager, analisi
 
-main_directory = '/Users/theo/Desktop/Ermes/test/dati_test/misure'
+main_directory = '/Users/theo/Desktop/Lavoro_Ermes/Lavoro1/misure'
 #/Users/theo/Desktop/Ermes/Misure
 chdir(main_directory)
 
@@ -16,7 +16,7 @@ chdir(main_directory)
 # Inizializzazione: lettura file e creazione tabelle =====================================
 
 m = manager() # inizializzazione delle directory e dei file
-m.iterate_directory() #iterazione su tutte le cartelle contenenti i dati .txt per salvare xls e csv
+m.iterate_directory(file_name = 'dati.txt') #iterazione su tutte le cartelle contenenti i dati .txt per salvare xls e csv
 # ==========================================================================
 
 # ==========================================================================
@@ -42,8 +42,7 @@ input(str_print_4input)
 
 # ==========================================================================
 # Valutazione Rischio 8 h =====================================
-m.VR8h_exel(data_folder + '/averaged_data.csv', main_directory + '/VR_8h.xlsx')
-
+a.DPI_HML(main_directory, H = 36.4, M =35.8, L = 33.8, beta = 0.5, grom = [1,2,3,4])
 
 
 
