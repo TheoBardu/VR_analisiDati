@@ -334,7 +334,15 @@ class manager:
             files.write_exel(df, f'{self.out_file_dir}/{dir}.xlsx')
             exel_file.adjust_column_lenght(f'{self.out_file_dir}/{dir}.xlsx', ['A'])
             exel_file.color_column(f'{self.out_file_dir}/{dir}.xlsx', ['F','I','K'], ['FFFF00','FFFF00','FFFF00'])
-        
+    
+    def VR8h_exel(self, name_averaged_data, out_VR8h_name):
+        '''
+        Funzione che gestisce il file finale della valutazione del rischio in 8h dei lavori. 
+        Importa il file xlsx e ne colora le colonne del colore specifico in base al grado di rischio.
+        '''
+        a = analisi(self.main_dir)
+        a.VR_8h(name_averaged_data)
+        exel_file.color_cell_VR8h(out_VR8h_name)
 
         
         

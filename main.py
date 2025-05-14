@@ -42,7 +42,8 @@ input(str_print_4input)
 
 # ==========================================================================
 # Valutazione Rischio 8 h =====================================
-a.DPI_HML(main_directory, H = 36.4, M =35.8, L = 33.8, beta = 0.5, grom = [1,2,3,4])
+a.VR_8h(data_folder + '/averaged_data.csv')
+a.DPI_HML(data_folder, H = 36.4, M =35.8, L = 33.8, beta = 0.5, grom = [1,2,3,4])
 
 
 
