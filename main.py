@@ -3,20 +3,22 @@
 # This code is the main code for the analysis of the data from the VR acquisitions
 
 from os import chdir, getcwd
+import sys
 from analisi_datiVR import manager, analisi
 
-main_directory = '/Users/theo/Desktop/Lavoro_Ermes/Lavoro1/misure'
+main_directory = '/Users/theo/Desktop/Ermes/test/dati_test/csv'
 #/Users/theo/Desktop/Ermes/Misure
 chdir(main_directory)
 
 
+# sys.stdout = open('VR_rumore.out', 'w')
 
 
 # ==========================================================================
 # Inizializzazione: lettura file e creazione tabelle =====================================
 
 m = manager() # inizializzazione delle directory e dei file
-m.iterate_directory(file_name = 'dati.txt') #iterazione su tutte le cartelle contenenti i dati .txt per salvare xls e csv
+m.iterate_directory(file_name = 'dati.txt',format='csv') #iterazione su tutte le cartelle contenenti i dati .txt per salvare xls e csv
 # ==========================================================================
 
 # ==========================================================================
@@ -42,8 +44,11 @@ input(str_print_4input)
 
 # ==========================================================================
 # Valutazione Rischio 8 h =====================================
+
 a.VR_8h(data_folder + '/averaged_data.csv')
-a.DPI_HML(data_folder, H = 36.4, M =35.8, L = 33.8, beta = 0.5, grom = [1,2,3,4])
+a.DPI_HML(data_folder, H = 36.4, M =35.8, L = 33.8, beta = 0.5, grom = [1,2,3,4]) 
 
 
+# sys.stdout.close()
+# sys.stdout = sys.__stdout__
 

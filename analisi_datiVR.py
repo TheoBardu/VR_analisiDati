@@ -113,7 +113,7 @@ class files:
     Classe che serve per leggere e scrivere i file
     '''
 
-    def read_measure_file(file, letter_ID, format='txt'):
+    def read_measure_file(file, letter_ID, format='txt',ntrack = 3):
         '''
         Funzione che legge il file di misura in txt o csv e restituisce un dataframe pandas.
 
@@ -121,6 +121,7 @@ class files:
             file = <str>, directory del file da leggere
             letter_ID = <str>, lettera della cartella dati (tipicamente D,E,F o W)
             format = <str>, "txt" o "csv" a seconda se leggere in txt o csv
+            ntrack = <int>, default = 3. Solo per format = 'csv'. Numero di tracce di divisione del file intero.
         OUTPUT:
             df = <pd.DataFrame>, dataframe contenente i dati della misura
         '''
@@ -244,11 +245,114 @@ class files:
             return df, ntracks[-1], nFiles
         
         elif format == 'csv':
-            print('Reading csv file')
+            import glob 
+            from numpy import average, min, max
+
+            #inizializzo il dataFrame pandas con il riassunto delle misure
+            df_tot = pd.DataFrame(columns=['fileID','letter_ID','nTrack','LeqA_min','LeqA_max','LeqA_eq','LeqC_min','LeqC_max','LeqC_eq','PeakC_max','PeakC_eq','durata','inizio','fine'])
             
+            
+            #Inizializzazione delle variabili di df_tot
+            fileIDs = []
+            letter_IDs = []
+            inizio = []
+            fine = []
+            durata = []
+            ntrack_id = []
+            LeqA_min = []
+            LeqA_max = []
+            LeqA_eq = []
+            LeqC_min = []
+            LeqC_max = []
+            LeqC_eq = []
+            PeakC_max = []
+            PeakC_eq = []
+
+
+
+            print('Reading csv files only')
+            csv_files = glob.glob('*.csv') # salvo la lista di tutti i file csv che ci sono
+
+            letter_id_number = 1 #inizializzo il numero della misura ad 1 per ogni nuovo file misure ( in modo che d1,d2,d3...f1,f2,f3...)
+            #itero sulla lista del numero di files csv
+            for file in csv_files:
+                
+                df = pd.read_csv(file,encoding='latin', skiprows=1, sep=';', engine = 'python') #leggo il file csv
+                df.iloc[:,0] = pd.to_datetime(df.iloc[:,0],format='%H:%M:%S', errors='coerce') # converto i dati della colonna in datetime
+                df.dropna(subset='Time',inplace=True) #tolgo tutte le righe che sono NaN nella colonna time
+                
+                df[df.columns[1:7]] = df[df.columns[1:7]].apply(pd.to_numeric, errors='coerce')
+
+                #identifico se la lunghezza della traccia può essere divisa perfettamente per il numero di tracce desiderate
+                n = (len(df)-1)%ntrack
+                if n == 0: #se può essere divisa perfettamente
+                    sep = int((len(df)-1)/ntrack)
+                else: #se non può essere divisa perfettamente
+                    df.drop(arange(n),inplace=True) #tolgo gli ultimi valori utili per avere una divisibilità buona
+                    df = df.reset_index(drop=True)
+                    sep = int((len(df)-1)/ntrack)
+                
+                # print(sep) #for debug
+
+                # Aggiunta valori alle liste <=============================
+                
+
+                ntrack_id_letter = 1 #variabile che mi tiene conto del numero di traccia di una misura (es: D1 track 1, D1 trak 2, D1 track 3, ...)
+                for i in range(ntrack):
+                    fileIDs.append(file) #salvo il nome de file 
+                    letter_IDs.append(letter_ID + str(letter_id_number)) #salvo la lettera del file
+                    ntrack_id.append(ntrack_id_letter)
+                    ntrack_id_letter += 1
+                    
+                    # print('##',i, i+i*sep) #for debug
+
+                    # Inizio e Fine
+                    inizio.append(df['Time'][i + i * sep].time()) #salvo la fine
+                    fine.append(df['Time'][(i+1)*sep].time()) #salvo l'inizio
+                    
+                    # Durata
+                    dT = df['Time'][(i+1)*sep] - df['Time'][i + i * sep]
+                    dT_str = f"{dT.components[1]:02d}:{dT.components[2]:02d}:{dT.components[3]:02d}"
+                    durata.append(dT_str)
+
+                    
+                    #LeqA
+                    LeqA_min.append(round(min(df['LAeq'][0+i*int(sep):(i+1)*int(sep)]),1))
+                    LeqA_max.append(round(max(df['LAeq'][0+i*int(sep):(i+1)*int(sep)]),1))
+                    LeqA_eq.append(round(average(df['LAeq'][0+i*int(sep):(i+1)*int(sep)]),1))
+
+                    #LeqC
+                    LeqC_min.append(round(min(df['LCeq'][0+i*int(sep):(i+1)*int(sep)]),1))
+                    LeqC_max.append(round(max(df['LCeq'][0+i*int(sep):(i+1)*int(sep)]),1))
+                    LeqC_eq.append(round(average(df['LCeq'][0+i*int(sep):(i+1)*int(sep)]),1))
+
+                    PeakC_max.append(round(max(df['LCpeak'][0+i*int(sep):(i+1)*int(sep)]),1))
+                    PeakC_eq.append(round(average(df['LCpeak'][0+i*int(sep):(i+1)*int(sep)]),1))
+
+                letter_id_number += 1
+            
+            df_tot['fileID'] = fileIDs
+            df_tot['letter_ID'] = letter_IDs
+            df_tot['nTrack'] = ntrack_id
+            df_tot['inizio'] = inizio
+            df_tot['fine'] = fine
+            df_tot['durata'] = durata
+            df_tot['LeqA_min'] = LeqA_min
+            df_tot['LeqA_max'] = LeqA_max
+            df_tot['LeqA_eq'] = LeqA_eq 
+            df_tot['LeqC_min'] = LeqC_min
+            df_tot['LeqC_max'] = LeqC_max
+            df_tot['LeqC_eq'] = LeqC_eq
+            df_tot['PeakC_max'] = PeakC_max
+            df_tot['PeakC_eq'] = PeakC_eq
+
+            return df_tot
+
+
+
 
         else:
-            error("Sono supportati solo 'txt' o 'csv' nella voce format")
+            error("Sono supportati solo formati 'txt' o 'csv' nella voce format")
 
 
     def write_csv(df,file):
@@ -308,6 +412,9 @@ class manager:
         if "VR_8h.csv" in self.file_list and "VR_8h.xlsx" in self.file_list:
             self.file_list.remove("VR_8h.csv")
             self.file_list.remove("VR_8h.xlsx")
+        
+        if "VR_rumore.out" in self.file_list:
+            self.file_list.remove("VR_rumore.out")
 
         
         print(f'Lista dei file nella directory: {self.file_list}') # stampa la lista dei file nella directory principale
@@ -317,23 +424,62 @@ class manager:
         '''
         Funzione che itera su tutte le directory per salvare i file.
         Crea i file csv e xlsx e colora le colonne opportune del file xlsx mediando tutti i dati.
+        INPUT: 
+            file_name = <str>, default: LSOURCES.txt. Nome dei file di input.
+            format = <str>, formato file. Disponibili: 'txt' o 'csv'
         '''
         from os import path, mkdir
-        for dir in self.file_list:
-            print(f'Iterazione sulla directory: {dir}') 
-            chdir(self.main_dir + '/' + dir + '/' + dir) 
 
-            self.out_file_dir = self.main_dir + '/' + 'data'
-            if path.isdir(self.out_file_dir) == False:
-                mkdir(self.out_file_dir)
+        #Verifica se esiste la cartella '/data' ed in caso la crea
+        self.out_file_dir = self.main_dir + '/' + 'data'
+        if path.isdir(self.out_file_dir) == False:
+                    mkdir(self.out_file_dir)
+
+
+        # Caso TXT ==============================
+        if format=='txt':
+            print('! TXT mode !')
             
-        
 
-            df, num_of_track, n_files = files.read_measure_file(file_name,list(dir)[-1], format = format)
-            files.write_csv(df, f'{self.out_file_dir}/{dir}.csv')
-            files.write_exel(df, f'{self.out_file_dir}/{dir}.xlsx')
-            exel_file.adjust_column_lenght(f'{self.out_file_dir}/{dir}.xlsx', ['A'])
-            exel_file.color_column(f'{self.out_file_dir}/{dir}.xlsx', ['F','I','K'], ['FFFF00','FFFF00','FFFF00'])
+            for dir in self.file_list:
+                print(f'Iterazione sulla directory: {dir}') 
+                chdir(self.main_dir + '/' + dir + '/' + dir) #entro nella cartella della misura i-esima
+            
+
+                df, num_of_track, n_files = files.read_measure_file(file_name,list(dir)[-1], format = format)
+                files.write_csv(df, f'{self.out_file_dir}/{dir}.csv')
+                files.write_exel(df, f'{self.out_file_dir}/{dir}.xlsx')
+                exel_file.adjust_column_lenght(f'{self.out_file_dir}/{dir}.xlsx', ['A'])
+                exel_file.color_column(f'{self.out_file_dir}/{dir}.xlsx', ['F','I','K'], ['FFFF00','FFFF00','FFFF00'])
+       
+        # Caso CSV ==============================
+        elif format=='csv':
+            print('! CSV mode !')
+            
+            
+            for dir in self.file_list:
+                print(f'Iterazione sulla directory: {dir}')    
+                chdir(self.main_dir + '/' + dir) # entro nella cartella dei dati (misE, misF, ecc...)
+                
+                df = files.read_measure_file(file_name,letter_ID=list(dir)[-1], format='csv') # salvo il DF totale delle misure  (D,E,F,ecc)
+                
+                #salvo i file nella cartella opportuna e nelle versioni csv ed exel
+                files.write_csv(df, f'{self.out_file_dir}/{dir}.csv')
+                files.write_exel(df, f'{self.out_file_dir}/{dir}.xlsx')
+                exel_file.adjust_column_lenght(f'{self.out_file_dir}/{dir}.xlsx', ['A'])
+                exel_file.color_column(f'{self.out_file_dir}/{dir}.xlsx', ['F','I','K'], ['FFFF00','FFFF00','FFFF00'])
+
+
+
+
+
+
+        
+        
+        else:
+            error("Disponibili solo i formati 'csv' o 'txt'. Controlla di aver inserito il testo correttamente.")
+
+
     
     def VR8h_exel(self, name_averaged_data, out_VR8h_name):
         '''
@@ -344,8 +490,6 @@ class manager:
         a.VR_8h(name_averaged_data)
         exel_file.color_cell_VR8h(out_VR8h_name)
 
-        
-        
     
 
 
