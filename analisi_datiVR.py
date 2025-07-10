@@ -267,18 +267,18 @@ class files:
             LeqC_eq = []
             PeakC_max = []
             PeakC_eq = []
-
+            
 
 
             print('Reading csv files only')
             csv_files = glob.glob('*.csv') # salvo la lista di tutti i file csv che ci sono
-            csv_files.sort()
+            csv_files.sort() # riordino per nome la lista dei file
 
             letter_id_number = 1 #inizializzo il numero della misura ad 1 per ogni nuovo file misure ( in modo che d1,d2,d3...f1,f2,f3...)
             #itero sulla lista del numero di files csv
             for file in csv_files:
                 
-                df = pd.read_csv(file,encoding='latin', skiprows=1, sep=';', engine = 'python') #leggo il file csv
+                df = pd.read_csv(file,encoding='latin', skiprows=1, sep=';', engine = 'python') #leggo il file csv delle misure
                 df.iloc[:,0] = pd.to_datetime(df.iloc[:,0],format='%H:%M:%S', errors='coerce') # converto i dati della colonna in datetime
                 df.dropna(subset='Time',inplace=True) #tolgo tutte le righe che sono NaN nella colonna time
                 
@@ -300,11 +300,12 @@ class files:
 
                 ntrack_id_letter = 1 #variabile che mi tiene conto del numero di traccia di una misura (es: D1 track 1, D1 trak 2, D1 track 3, ...)
                 for i in range(ntrack):
-                    fileIDs.append(file) #salvo il nome de file 
+                    fileIDs.append(file) #salvo il nome del file 
                     letter_IDs.append(letter_ID + str(letter_id_number)) #salvo la lettera del file
                     ntrack_id.append(ntrack_id_letter)
                     ntrack_id_letter += 1
                     
+                    # print(letter_ID) # for debug
                     # print('##',i, i+i*sep) #for debug
 
                     # Inizio e Fine
@@ -320,12 +321,14 @@ class files:
                     #LeqA
                     LeqA_min.append(round(min(df['LAeq'][0+i*int(sep):(i+1)*int(sep)]),1))
                     LeqA_max.append(round(max(df['LAeq'][0+i*int(sep):(i+1)*int(sep)]),1))
-                    LeqA_eq.append(round(average(df['LAeq'][0+i*int(sep):(i+1)*int(sep)]),1))
+                    LeqA_eq.append(round(10*log10(sum(10**(df['LAeq'][0+i*int(sep):(i+1)*int(sep)]/10))/(len(df['LAeq'][0+i*int(sep):(i+1)*int(sep)])) ),1))
+                    # print(len(df['LAeq'][0+i*int(sep):(i+1)*int(sep)]))
+                    # input()
 
                     #LeqC
                     LeqC_min.append(round(min(df['LCeq'][0+i*int(sep):(i+1)*int(sep)]),1))
                     LeqC_max.append(round(max(df['LCeq'][0+i*int(sep):(i+1)*int(sep)]),1))
-                    LeqC_eq.append(round(average(df['LCeq'][0+i*int(sep):(i+1)*int(sep)]),1))
+                    LeqC_eq.append(round( 10*log10(sum(10**(df['LCeq'][0+i*int(sep):(i+1)*int(sep)]/10))/(len(df['LCeq'][0+i*int(sep):(i+1)*int(sep)])) ),1))
 
                     PeakC_max.append(round(max(df['LCpeak'][0+i*int(sep):(i+1)*int(sep)]),1))
                     PeakC_eq.append(round(average(df['LCpeak'][0+i*int(sep):(i+1)*int(sep)]),1))
@@ -346,6 +349,7 @@ class files:
             df_tot['LeqC_eq'] = LeqC_eq
             df_tot['PeakC_max'] = PeakC_max
             df_tot['PeakC_eq'] = PeakC_eq
+            
 
             return df_tot
 
@@ -550,9 +554,9 @@ class analisi:
                     idx = df[df.columns[1]] == fileIDs[i] # prendo solo i valori opportuni
                     
                     #calcolo i valori medi
-                    LeqA_mean[i] = round(mean(df['LeqA_max'][idx]),1)
-                    LeqC_mean[i] = round(mean(df['LeqC_max'][idx]) + std(df['LeqC_max'][idx],ddof=1),1)
-                    Ppeak_mean[i] = round(max(df['PeakC_max'][idx]) + 1.56,1)
+                    LeqA_mean[i] = round(mean(df['LeqA_eq'][idx]),1)
+                    LeqC_mean[i] = round(mean(df['LeqC_eq'][idx]),1) # + std(df['LeqC_max'][idx],ddof=1) (in caso da aggiungere se serve)
+                    Ppeak_mean[i] = round(max(df['PeakC_max'][idx]),1) # + 1.56 in caso da aggiungere 
                     # print(LeqA_mean)
                     
                     #calcolo l'incertezza sulla misura LeqA (SDOM)
