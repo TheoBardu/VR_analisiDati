@@ -6,7 +6,7 @@ from os import chdir, getcwd
 import sys
 from analisi_datiVR import manager, analisi
 
-main_directory = '/Users/theo/Desktop/Lavoro_Ermes/Lavoro2/misure'
+main_directory = '/Users/theo/Desktop/Lavoro_Ermes/Lavoro4_Tower/Misure'
 #/Users/theo/Desktop/Ermes/Misure
 chdir(main_directory)
 
