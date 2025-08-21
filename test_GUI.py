@@ -20,9 +20,10 @@ class RedirectedStdout:
 def run_script(main_directory, output_widget):
     """Esegui il tuo codice Python"""
     try:
-        import main  
+        # QUI va importato o eseguito il tuo codice, usando main_directory
+        # esempio: una funzione principale che prende main_directory
+        import main  # supponiamo tu abbia il tuo codice in 'tuo_script.py'
         main.main(main_directory)  # chiamata alla tua funzione principale
-        
     except Exception as e:
         print(f"Errore: {e}")
 
