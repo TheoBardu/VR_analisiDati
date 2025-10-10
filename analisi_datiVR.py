@@ -113,7 +113,7 @@ class files:
     Classe che serve per leggere e scrivere i file
     '''
 
-    def read_measure_file(file, letter_ID, format='txt',ntrack = 3):
+    def read_measure_file(file, letter_ID, format='txt',ntrack = 6):
         '''
         Funzione che legge il file di misura in txt o csv e restituisce un dataframe pandas.
 
