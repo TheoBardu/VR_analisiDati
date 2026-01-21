@@ -113,7 +113,7 @@ class files:
     Classe che serve per leggere e scrivere i file
     '''
 
-    def read_measure_file(file, letter_ID, format='txt',ntrack = 6):
+    def read_measure_file(file, letter_ID, format='txt',ntrack = 6, decimals = 1):
         '''
         Funzione che legge il file di misura in txt o csv e restituisce un dataframe pandas.
 
@@ -249,7 +249,7 @@ class files:
             from numpy import average, min, max
 
             #inizializzo il dataFrame pandas con il riassunto delle misure
-            df_tot = pd.DataFrame(columns=['fileID','letter_ID','nTrack','LeqA_min','LeqA_max','LeqA_eq','LeqC_min','LeqC_max','LeqC_eq','PeakC_max','PeakC_eq','durata','inizio','fine'])
+            df_tot = pd.DataFrame(columns=['fileID','letter_ID','nTrack','LeqA_min','LeqA_max','LeqA_eq','LeqC_min','LeqC_max','LeqC_eq','PeakC_max','PeakC_eq','LASeq_T','LAIeq_T','durata','inizio','fine'])
             
             
             #Inizializzazione delle variabili di df_tot
@@ -267,6 +267,8 @@ class files:
             LeqC_eq = []
             PeakC_max = []
             PeakC_eq = []
+            LASeq_T = []
+            LAIeq_T = []
             
 
 
@@ -319,19 +321,23 @@ class files:
 
                     
                     #LeqA
-                    LeqA_min.append(round(min(df['LAeq'][0+i*int(sep):(i+1)*int(sep)]),1))
-                    LeqA_max.append(round(max(df['LAeq'][0+i*int(sep):(i+1)*int(sep)]),1))
-                    LeqA_eq.append(round(10*log10(sum(10**(df['LAeq'][0+i*int(sep):(i+1)*int(sep)]/10))/(len(df['LAeq'][0+i*int(sep):(i+1)*int(sep)])) ),1))
+                    LeqA_min.append(round(min(df['LAeq'][0+i*int(sep):(i+1)*int(sep)]),decimals))
+                    LeqA_max.append(round(max(df['LAeq'][0+i*int(sep):(i+1)*int(sep)]),decimals))
+                    LeqA_eq.append(round(10*log10(sum(10**(df['LAeq'][0+i*int(sep):(i+1)*int(sep)]/10))/(len(df['LAeq'][0+i*int(sep):(i+1)*int(sep)])) ),decimals))
                     # print(len(df['LAeq'][0+i*int(sep):(i+1)*int(sep)]))
                     # input()
 
                     #LeqC
-                    LeqC_min.append(round(min(df['LCeq'][0+i*int(sep):(i+1)*int(sep)]),1))
-                    LeqC_max.append(round(max(df['LCeq'][0+i*int(sep):(i+1)*int(sep)]),1))
-                    LeqC_eq.append(round( 10*log10(sum(10**(df['LCeq'][0+i*int(sep):(i+1)*int(sep)]/10))/(len(df['LCeq'][0+i*int(sep):(i+1)*int(sep)])) ),1))
+                    LeqC_min.append(round(min(df['LCeq'][0+i*int(sep):(i+1)*int(sep)]),decimals))
+                    LeqC_max.append(round(max(df['LCeq'][0+i*int(sep):(i+1)*int(sep)]),decimals))
+                    LeqC_eq.append(round( 10*log10(sum(10**(df['LCeq'][0+i*int(sep):(i+1)*int(sep)]/10))/(len(df['LCeq'][0+i*int(sep):(i+1)*int(sep)])) ),decimals))
 
-                    PeakC_max.append(round(max(df['LCpeak'][0+i*int(sep):(i+1)*int(sep)]),1))
-                    PeakC_eq.append(round(average(df['LCpeak'][0+i*int(sep):(i+1)*int(sep)]),1))
+                    PeakC_max.append(round(max(df['LCpeak'][0+i*int(sep):(i+1)*int(sep)]),decimals))
+                    PeakC_eq.append(round(average(df['LCpeak'][0+i*int(sep):(i+1)*int(sep)]),decimals))
+
+                    #LAeqS and LAeqI
+                    LASeq_T.append(round(10*log10(sum(10**(df['LASeqT'][0+i*int(sep):(i+1)*int(sep)]/10))/(len(df['LASeqT'][0+i*int(sep):(i+1)*int(sep)]))),decimals))
+                    LAIeq_T.append(round(10*log10(sum(10**(df['LAIeqT'][0+i*int(sep):(i+1)*int(sep)]/10))/(len(df['LAIeqT'][0+i*int(sep):(i+1)*int(sep)]))),decimals))
 
                 letter_id_number += 1
             
@@ -344,11 +350,14 @@ class files:
             df_tot['LeqA_min'] = LeqA_min
             df_tot['LeqA_max'] = LeqA_max
             df_tot['LeqA_eq'] = LeqA_eq 
+            df_tot['LASeq_T'] = LASeq_T
+            df_tot['LAIeq_T'] = LAIeq_T
             df_tot['LeqC_min'] = LeqC_min
             df_tot['LeqC_max'] = LeqC_max
             df_tot['LeqC_eq'] = LeqC_eq
             df_tot['PeakC_max'] = PeakC_max
             df_tot['PeakC_eq'] = PeakC_eq
+            
             
 
             return df_tot
@@ -472,7 +481,7 @@ class manager:
                 files.write_csv(df, f'{self.out_file_dir}/{dir}.csv')
                 files.write_exel(df, f'{self.out_file_dir}/{dir}.xlsx')
                 exel_file.adjust_column_lenght(f'{self.out_file_dir}/{dir}.xlsx', ['A'])
-                exel_file.color_column(f'{self.out_file_dir}/{dir}.xlsx', ['F','I','K'], ['FFFF00','FFFF00','FFFF00'])
+                exel_file.color_column(f'{self.out_file_dir}/{dir}.xlsx', ['F','I','J'], ['FFFF00','FFFF00','FFFF00'])
 
 
 
