@@ -6,7 +6,7 @@ from os import chdir, getcwd
 import sys
 from analisi_datiVR import manager, analisi
 
-main_directory = '/Users/theo/Desktop/Ermes/Lavori/Lavoro5/Misure'
+main_directory = '/Users/theo/Desktop/P.IVA/Ermes/Lavori/Kermet/misure/txt'
 
 
 def main(main_directory):
@@ -17,7 +17,7 @@ def main(main_directory):
     # Inizializzazione: lettura file e creazione tabelle =====================================
 
     m = manager() # inizializzazione delle directory e dei file
-    m.iterate_directory(file_name = 'dati.txt',format='csv') #iterazione su tutte le cartelle contenenti i dati .txt per salvare xls e csv
+    m.iterate_directory(file_name = 'dati.txt',format='txt') #iterazione su tutte le cartelle contenenti i dati .txt per salvare xls e csv
     # ==========================================================================
 
     # ==========================================================================

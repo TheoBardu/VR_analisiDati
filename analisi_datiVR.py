@@ -443,6 +443,156 @@ class manager:
             format = <str>, formato file. Disponibili: 'txt' o 'csv'
         '''
         from os import path, mkdir
+        def read_W_file_txt(file: str, letter_ID: str, decimals: int = 1) -> pd.DataFrame:
+            """
+            Legge un file in formato 'dati.txt' (output strumento WED con 6 sorgenti,
+            separatore decimale virgola, etichette 'Fast A' / 'Fast C' / 'Picco C')
+            e restituisce un DataFrame pandas compatibile con l'output di read_measure_file()
+            nel formato txt classico (LSOURCES.txt).
+
+            INPUT:
+                file       : <str>  percorso del file da leggere
+                letter_ID  : <str>  lettera identificativa della sessione (es. 'D', 'F', ...)
+                decimals   : <int>  cifre decimali per l'arrotondamento (default 1)
+
+            OUTPUT:
+                df : pd.DataFrame con colonne:
+                    fileID, letter_ID, nTrack,
+                    LeqA_min, LeqA_max, LeqA_eq,
+                    LeqC_min, LeqC_max, LeqC_eq,
+                    PeakC_max, PeakC_eq,
+                    durata, inizio, fine
+            """
+
+            # ── lettura file ─────────────────────────────────────────────────────────
+            with open(file, 'r', encoding='utf-16') as f:
+                lines = f.readlines()
+
+            # ── inizializzazione colonne output ──────────────────────────────────────
+            fileIDs    = []
+            letter_IDs = []
+            nTrack_col = []
+            LeqA_min   = []
+            LeqA_max   = []
+            LeqA_eq    = []
+            LeqC_min   = []
+            LeqC_max   = []
+            LeqC_eq    = []
+            PeakC_max  = []
+            PeakC_eq   = []
+            durata_col = []
+            inizio_col = []
+            fine_col   = []
+
+            # ── helper: converte stringa con virgola decimale → float ────────────────
+            def to_float(s: str) -> float:
+                return float(s.strip().replace(',', '.'))
+
+            # ── helper: estrae i valori di una sorgente da una riga tabulare ─────────
+            # Ogni sorgente occupa 4 campi: [Leq_eq, Lmin, Lmax, durata]
+            # (per Picco C: [vuoto, Lmin, Lmax, durata] → Lmin=PeakC_min skip, Lmax=PeakC_max)
+            # La riga inizia con l'etichetta di ubicazione, poi i campi per tutte le sorgenti.
+            def parse_row(tokens: list, n_sorgenti: int):
+                """
+                Restituisce lista di dict con chiavi eq, min, max, dur per ogni sorgente.
+                Per 'Picco C' il campo 'eq' sarà vuoto-stringa (lo gestiamo dopo).
+                """
+                result = []
+                # tokens[0] = etichetta ubicazione, poi gruppi di 4 per ogni sorgente
+                for i in range(n_sorgenti):
+                    base = 1 + i * 4
+                    result.append({
+                        'eq':  tokens[base].strip(),
+                        'min': tokens[base + 1].strip(),
+                        'max': tokens[base + 2].strip(),
+                        'dur': tokens[base + 3].strip(),
+                    })
+                return result
+
+            # ── scansione linee ───────────────────────────────────────────────────────
+            file_counter = 0  # contatore file nella sessione (→ letter_ID + numero)
+
+            i = 0
+            while i < len(lines):
+                line = lines[i]
+
+                if line.startswith('File\t'):
+                    # ── nuova misurazione ─────────────────────────────────────────────
+                    file_counter += 1
+                    fileID = line.split('\t')[1].strip()
+
+                    # Inizio e Fine (righe +1, +2)
+                    inizio_str = lines[i + 1].split('\t')[1].strip()   # es. "24/09/2025 09:43:24"
+                    fine_str   = lines[i + 2].split('\t')[1].strip()
+
+                    # Numero di sorgenti dalla riga +3  →  "Sorgente\t1\t2\t3\t4\t5\t6"
+                    sorgente_tokens = lines[i + 3].strip().split('\t')
+                    n_sorgenti = len(sorgente_tokens) - 1  # esclude la parola 'Sorgente'
+
+                    # Righe dati: +7 = Fast A, +8 = Fast C, +9 = Picco C
+                    row_fastA  = lines[i + 7].strip().split('\t')
+                    row_fastC  = lines[i + 8].strip().split('\t')
+                    row_piccoC = lines[i + 9].strip().split('\t')
+
+                    vals_A = parse_row(row_fastA,  n_sorgenti)
+                    vals_C = parse_row(row_fastC,  n_sorgenti)
+                    vals_P = parse_row(row_piccoC, n_sorgenti)
+
+                    # ── una riga per ogni sorgente ────────────────────────────────────
+                    for s in range(n_sorgenti):
+                        fileIDs.append(fileID)
+                        letter_IDs.append(letter_ID + str(file_counter))
+                        nTrack_col.append(s + 1)
+
+                        # LeqA
+                        LeqA_eq .append(round(to_float(vals_A[s]['eq']),  decimals))
+                        LeqA_min.append(round(to_float(vals_A[s]['min']), decimals))
+                        LeqA_max.append(round(to_float(vals_A[s]['max']), decimals))
+
+                        # LeqC
+                        LeqC_eq .append(round(to_float(vals_C[s]['eq']),  decimals))
+                        LeqC_min.append(round(to_float(vals_C[s]['min']), decimals))
+                        LeqC_max.append(round(to_float(vals_C[s]['max']), decimals))
+
+                        # Picco C  →  'eq' è vuoto nel file; usiamo min=PeakC_min (non salvato),
+                        #             max=PeakC_max; PeakC_eq calcolato come media aritmetica
+                        #             (per coerenza con il codice originale che usa average())
+                        PeakC_max.append(round(to_float(vals_P[s]['max']), decimals))
+                        # PeakC_eq: nel formato LSOURCES era calcolato come media dei picchi
+                        # istantanei; qui abbiamo solo il valore complessivo → lo usiamo come eq
+                        PeakC_eq .append(round(to_float(vals_P[s]['min']), decimals))  # 'min' = Lmin del picco
+
+                        # durata, inizio, fine
+                        durata_col.append(vals_A[s]['dur'])
+                        inizio_col.append(inizio_str)
+                        fine_col  .append(fine_str)
+
+                    i += 10  # salta l'intero blocco (10 righe per blocco)
+                    continue
+
+                i += 1
+
+            # ── costruzione DataFrame ─────────────────────────────────────────────────
+            df = pd.DataFrame({
+                'fileID'    : fileIDs,
+                'letter_ID' : letter_IDs,
+                'nTrack'    : nTrack_col,
+                'LeqA_min'  : LeqA_min,
+                'LeqA_max'  : LeqA_max,
+                'LeqA_eq'   : LeqA_eq,
+                'LeqC_min'  : LeqC_min,
+                'LeqC_max'  : LeqC_max,
+                'LeqC_eq'   : LeqC_eq,
+                'PeakC_max' : PeakC_max,
+                'PeakC_eq'  : PeakC_eq,
+                'durata'    : durata_col,
+                'inizio'    : inizio_col,
+                'fine'      : fine_col,
+            })
+
+            print(f'Lettura completata: {file_counter} file, {len(df)} righe totali ({n_sorgenti} sorgenti per file)')
+            return df
+
 
         #Verifica se esiste la cartella '/data' ed in caso la crea
         self.out_file_dir = self.main_dir + '/' + 'data'
@@ -459,6 +609,8 @@ class manager:
                 print(f'Iterazione sulla directory: {dir}') 
                 chdir(self.main_dir + '/' + dir + '/' + dir) #entro nella cartella della misura i-esima
             
+                if dir == "misW":
+                    df = read_W_file_txt('misW.txt','W')
 
                 df, num_of_track, n_files = files.read_measure_file(file_name,list(dir)[-1], format = format)
                 files.write_csv(df, f'{self.out_file_dir}/{dir}.csv')
