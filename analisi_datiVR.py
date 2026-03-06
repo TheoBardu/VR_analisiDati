@@ -611,8 +611,9 @@ class manager:
             
                 if dir == "misW":
                     df = read_W_file_txt('misW.txt','W')
-
-                df, num_of_track, n_files = files.read_measure_file(file_name,list(dir)[-1], format = format)
+                else:
+                    df, num_of_track, n_files = files.read_measure_file(file_name,list(dir)[-1], format = format)
+                
                 files.write_csv(df, f'{self.out_file_dir}/{dir}.csv')
                 files.write_exel(df, f'{self.out_file_dir}/{dir}.xlsx')
                 exel_file.adjust_column_lenght(f'{self.out_file_dir}/{dir}.xlsx', ['A'])
@@ -627,7 +628,10 @@ class manager:
                 print(f'Iterazione sulla directory: {dir}')    
                 chdir(self.main_dir + '/' + dir) # entro nella cartella dei dati (misE, misF, ecc...)
                 
-                df = files.read_measure_file(file_name,letter_ID=list(dir)[-1], format='csv') # salvo il DF totale delle misure  (D,E,F,ecc)
+                if dir == "misW":
+                    df = read_W_file_txt('misW.txt','W')
+                else:
+                    df = files.read_measure_file(file_name,letter_ID=list(dir)[-1], format='csv') # salvo il DF totale delle misure  (D,E,F,ecc)
                 
                 #salvo i file nella cartella opportuna e nelle versioni csv ed exel
                 files.write_csv(df, f'{self.out_file_dir}/{dir}.csv')
