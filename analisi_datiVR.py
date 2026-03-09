@@ -737,8 +737,8 @@ class analisi:
                 df_avg = pd.concat([df_avg,new_df], ignore_index=True)
             
             
-            df_avg['Ti'] = [10] * len(df_avg) #creo la colonna con i valori di exposure time
-            df_avg['GrOm'] = [1] * len(df_avg) #creo la colonna con gli ID del gruppo omogeneo
+            df_avg['Ti'] = [[10,10]] * len(df_avg) #creo la colonna con i valori di exposure time
+            df_avg['GrOm'] = [[1,2]] * len(df_avg) #creo la colonna con gli ID del gruppo omogeneo
             df_avg['DPI'] = [False] * len(df_avg) #creo la colonna contenente il riferimento all'uso del DPI
 
 
