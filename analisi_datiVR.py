@@ -739,7 +739,7 @@ class analisi:
             
             df_avg['Ti'] = [[10,10]] * len(df_avg) #creo la colonna con i valori di exposure time
             df_avg['GrOm'] = [[1,2]] * len(df_avg) #creo la colonna con gli ID del gruppo omogeneo
-            df_avg['DPI'] = [False] * len(df_avg) #creo la colonna contenente il riferimento all'uso del DPI
+            df_avg['DPI'] = [[False,True]] * len(df_avg) #creo la colonna contenente il riferimento all'uso del DPI
 
 
             files.write_csv(df_avg, self.main_dir + '/averaged_data.csv')
