@@ -803,6 +803,113 @@ class analisi:
         return self.U_ext, self.U_comb_std
 
 
+    def analisi_8h(self, output_dir, df_avg, T0=480, u2m=0.7, u_pos=1.0):
+        '''
+        Funzione che calcola la valutazione del rischio rumore su base giornaliera (8h)
+        per ogni gruppo omogeneo presente in df_avg.
+
+        Per ogni gruppo omogeneo vengono calcolati:
+            - Lex8h    : livello sonoro equivalente ponderato A su 8h  [cella I44 / G44 del foglio Excel]
+            - U        : incertezza estesa                              [cella K44 / G46 del foglio Excel]
+            - Lex_max  : Lex8h + U                                     [cella O44 del foglio Excel]
+            - L_picco_C: massimo dei Ppeak nel gruppo omogeneo         [cella O45 del foglio Excel]
+
+        TEORIA (D.Lgs. 81/08, norma ISO 9612):
+
+            AG_i    = Ti/T0 * 10^(LeqA_i / 10)              [col. AG foglio Excel]
+            Lex8h   = 10 * log10( SUM(AG_i) )                [G44 = I44]
+
+            Z_i     = Ti/T0 * 10^((LeqA_i - Lex8h) / 10)   [col. Z foglio Excel]
+            W_i     = max(0, Z_i^2 * (u_i^2 + u2m^2 + u_pos^2))  [col. W foglio Excel]
+                      (il II termine X_i, legato alla variabilita` di Tm, e` posto = 0)
+            U_comb  = SUM(W_i)                               [G45]
+            U       = 1.65 * sqrt(U_comb)                    [G46 = K44]
+
+            Lex_max   = Lex8h + U                            [O44]
+            L_picco_C = max(Ppeak nel gruppo)                [O45]
+
+        INPUT:
+            output_dir = <str>, directory in cui salvare i file di output
+            df_avg     = <pd.DataFrame>, dataframe con le medie delle misure.
+                         Le colonne Ti e GrOm contengono liste (una voce per ogni
+                         gruppo omogeneo di appartenenza della misura).
+                         Esempio riga: ID='F1', Ti=[230,90,180], GrOm=['M1','M2','M3']
+            T0         = <int>, tempo di riferimento in minuti (default 480 = 8h)
+            u2m        = <float>, incertezza strumentale U2 (default 0.7 dB)
+            u_pos      = <float>, incertezza di posizione U3 (default 1.0 dB)
+
+        OUTPUT (file scritti in output_dir):
+            VR8h_<GrOm>.csv  e  VR8h_<GrOm>.xlsx  per ogni gruppo omogeneo,
+            contenenti: Lex8h, U, Lex_max, L_picco_C
+        '''
+        import ast
+        import os
+
+        # ----------------------------------------------------------------
+        # STEP 1 — Parsing di Ti e GrOm: lista Python o stringa da CSV
+        #          Esplosione del dataframe: una riga per ogni (ID, GrOm, Ti)
+        # ----------------------------------------------------------------
+        rows = []
+        for _, row in df_avg.iterrows():
+            ti_list   = row['Ti']   if isinstance(row['Ti'],   list) else ast.literal_eval(row['Ti'])
+            grom_list = row['GrOm'] if isinstance(row['GrOm'], list) else ast.literal_eval(row['GrOm'])
+            for ti, grom in zip(ti_list, grom_list):
+                rows.append({**row.to_dict(), 'Ti': ti, 'GrOm': grom})
+        df_exp = pd.DataFrame(rows)
+
+        # ----------------------------------------------------------------
+        # STEP 2 — Ciclo su ogni gruppo omogeneo
+        # ----------------------------------------------------------------
+        for grp_name, grp in df_exp.groupby('GrOm'):
+
+            # STEP 3 — Verifica che la somma dei Ti sia esattamente T0
+            tot_ti = grp['Ti'].sum()
+            if tot_ti != T0:
+                raise ValueError(
+                    f"Gruppo omogeneo '{grp_name}': somma dei Ti = {tot_ti} min "
+                    f"!= T0 = {T0} min. Controlla i valori di Ti nel file averaged_data."
+                )
+
+            leqa  = grp['LeqA'].values
+            ti    = grp['Ti'].values
+            u_mis = grp['U'].values
+
+            # STEP 4 — Lex8h  (cella G44 = I44 del foglio Excel)
+            #          AG_i = Ti/T0 * 10^(LeqA_i / 10)
+            lex8h = 10 * log10(sum(ti / T0 * 10**(leqa / 10)))
+
+            # STEP 5 — Incertezza estesa U  (cella G46 = K44 del foglio Excel)
+            #          Z_i = Ti/T0 * 10^((LeqA_i - Lex8h) / 10)   [col. Z]
+            #          W_i = max(0, Z_i^2 * (u_i^2 + u2m^2 + u_pos^2))  [col. W]
+            #          II termine X_i = 0  (Tmax/Tmin non disponibili in df_avg)
+            z       = ti / T0 * 10**((leqa - lex8h) / 10)
+            w       = maximum(z**2 * (u_mis**2 + u2m**2 + u_pos**2), 0)
+            U_val   = 1.65 * sqrt(sum(w))
+
+            # STEP 6 — Lex_max (O44) e L_picco_C (O45)
+            lex_max   = lex8h + U_val
+            l_picco_c = max(grp['Ppeak'].values)
+
+            # STEP 7 — Scrittura CSV ed Excel
+            df_out = pd.DataFrame({
+                'GrOm':      [grp_name],
+                'Lex8h':     [round(lex8h,    1)],
+                'U':         [round(U_val,    1)],
+                'Lex_max':   [round(lex_max,  1)],
+                'L_picco_C': [round(l_picco_c, 1)],
+            })
+
+            csv_path  = os.path.join(output_dir, f'VR8h_{grp_name}.csv')
+            xlsx_path = os.path.join(output_dir, f'VR8h_{grp_name}.xlsx')
+            df_out.to_csv(csv_path,   index=True)
+            df_out.to_excel(xlsx_path, index=True)
+
+            print(f'Gruppo {grp_name}: Lex8h={round(lex8h,1)} dB(A), '
+                  f'U={round(U_val,1)} dB, Lex_max={round(lex_max,1)} dB(A), '
+                  f'L_picco_C={round(l_picco_c,1)} dB(C)  ->  salvato in {output_dir}')
+
+        print('analisi_8h completata.')
+
     def VR_8h(self,df_avg_dir):
             '''
             Funzione che analizza i dati avg per restituire i valori nelle 8h.
