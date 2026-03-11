@@ -6,12 +6,16 @@ from os import chdir, getcwd
 import sys
 from analisi_datiVR import manager, analisi
 
-main_directory = '/Users/theo/Desktop/P.IVA/Ermes/Lavori/Kermet/misure'
+# La main directory deve essere la root (quindi la cartella dell'azienda)
+main_directory = '/Users/theo/Desktop/P.IVA/Ermes/Lavori/PARESA'
+misure_directory = '/misure'
+risultati_directory = '/output'
 
 
 def main(main_directory):
     # sys.stdout = open('VR_rumore.out', 'w')
-    chdir(main_directory)
+
+    chdir(main_directory + misure_directory) # mi sposto nella cartella delle misure
 
     # ==========================================================================
     # Inizializzazione: lettura file e creazione tabelle =====================================
@@ -23,7 +27,7 @@ def main(main_directory):
     # ==========================================================================
     # analisi dei dati acquisiti =====================================
 
-    data_folder = main_directory + '/data' 
+    data_folder = main_directory + misure_directory + '/data' 
     a = analisi(data_folder)
     df_avg = a.average_values() #creazione delle medie delle misure
     # # print(df_avg)
@@ -39,11 +43,14 @@ def main(main_directory):
     '''
     input(str_print_4input)
 
-
+    
 
     # ==========================================================================
     # Valutazione Rischio 8 h =====================================
-
+    
+    a.analisi_8h(main_directory + risultati_directory, df_avg)
+    
+    
     # a.VR_8h(data_folder + '/averaged_data.csv')
     # a.DPI_HML(data_folder, H = 36.4, M =35.8, L = 33.8, beta = 0.5, grom = [1,2,3,4]) 
 
