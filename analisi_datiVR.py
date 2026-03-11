@@ -809,24 +809,24 @@ class analisi:
         per ogni gruppo omogeneo presente in df_avg.
 
         Per ogni gruppo omogeneo vengono calcolati:
-            - Lex8h    : livello sonoro equivalente ponderato A su 8h  
-            - U        : incertezza estesa                              
-            - Lex_max  : Lex8h + U                                     
-            - L_picco_C: massimo dei Ppeak nel gruppo omogeneo         
+            - Lex8h    : livello sonoro equivalente ponderato A su 8h  [cella I44 / G44 del foglio Excel]
+            - U        : incertezza estesa                              [cella K44 / G46 del foglio Excel]
+            - Lex_max  : Lex8h + U                                     [cella O44 del foglio Excel]
+            - L_picco_C: massimo dei Ppeak nel gruppo omogeneo         [cella O45 del foglio Excel]
 
         TEORIA (D.Lgs. 81/08, norma ISO 9612):
 
-            AG_i    = Ti/T0 * 10^(LeqA_i / 10)              
-            Lex8h   = 10 * log10( SUM(AG_i) )                
+            AG_i    = Ti/T0 * 10^(LeqA_i / 10)              [col. AG foglio Excel]
+            Lex8h   = 10 * log10( SUM(AG_i) )                [G44 = I44]
 
-            Z_i     = Ti/T0 * 10^((LeqA_i - Lex8h) / 10)   
-            W_i     = max(0, Z_i^2 * (u_i^2 + u2m^2 + u_pos^2))  
+            Z_i     = Ti/T0 * 10^((LeqA_i - Lex8h) / 10)   [col. Z foglio Excel]
+            W_i     = max(0, Z_i^2 * (u_i^2 + u2m^2 + u_pos^2))  [col. W foglio Excel]
                       (il II termine X_i, legato alla variabilita` di Tm, e` posto = 0)
-            U_comb  = SUM(W_i)                               
-            U       = 1.65 * sqrt(U_comb)                    
+            U_comb  = SUM(W_i)                               [G45]
+            U       = 1.65 * sqrt(U_comb)                    [G46 = K44]
 
-            Lex_max   = Lex8h + U                            
-            L_picco_C = max(Ppeak nel gruppo)               
+            Lex_max   = Lex8h + U                            [O44]
+            L_picco_C = max(Ppeak nel gruppo)                [O45]
 
         INPUT:
             output_dir = <str>, directory in cui salvare i file di output
@@ -839,8 +839,10 @@ class analisi:
             u_pos      = <float>, incertezza di posizione U3 (default 1.0 dB)
 
         OUTPUT (file scritti in output_dir):
-            VR8h_<GrOm>.csv  e  VR8h_<GrOm>.xlsx  per ogni gruppo omogeneo,
-            contenenti: Lex8h, U, Lex_max, L_picco_C
+            VR8h.csv  e  VR8h.xlsx  : file unico riepilogativo con i risultati di tutti
+                                       i gruppi omogenei (GrOm, Lex8h, U, Lex_max, L_picco_C)
+            VR8h_<GrOm>.csv  e  VR8h_<GrOm>.xlsx  : un file per ogni gruppo omogeneo con
+                                       il dettaglio delle misure (ID, LeqA, LeqC, U, Ti)
         '''
         import ast
         import os
@@ -858,8 +860,10 @@ class analisi:
         df_exp = pd.DataFrame(rows)
 
         # ----------------------------------------------------------------
-        # STEP 2 — Ciclo su ogni gruppo omogeneo
+        # STEP 2 — Ciclo su ogni gruppo omogeneo: calcoli e raccolta risultati
         # ----------------------------------------------------------------
+        summary_rows = []  # raccoglie una riga di riepilogo per ogni gruppo
+
         for grp_name, grp in df_exp.groupby('GrOm'):
 
             # STEP 3 — Verifica che la somma dei Ti sia esattamente T0
@@ -882,40 +886,51 @@ class analisi:
             #          Z_i = Ti/T0 * 10^((LeqA_i - Lex8h) / 10)   [col. Z]
             #          W_i = max(0, Z_i^2 * (u_i^2 + u2m^2 + u_pos^2))  [col. W]
             #          II termine X_i = 0  (Tmax/Tmin non disponibili in df_avg)
-            z       = ti / T0 * 10**((leqa - lex8h) / 10)
-            w       = max(z**2 * (u_mis**2 + u2m**2 + u_pos**2), 0)
-            U_val   = 1.65 * sqrt(sum(w))
+            z     = ti / T0 * 10**((leqa - lex8h) / 10)
+            w     = max(z**2 * (u_mis**2 + u2m**2 + u_pos**2), 0)
+            U_val = 1.65 * sqrt(sum(w))
 
-            # STEP 6 — Lex_max e L_picco_C 
+            # STEP 6 — Lex_max (O44) e L_picco_C (O45)
             lex_max   = lex8h + U_val
             l_picco_c = max(grp['Ppeak'].values)
 
-            # STEP 7 — Scrittura CSV ed Excel
-            df_out = pd.DataFrame({
-                'GrOm':      [grp_name],
-                'Lex8h':     [round(lex8h,    1)],
-                'U':         [round(U_val,    1)],
-                'Lex_max':   [round(lex_max,  1)],
-                'L_picco_C': [round(l_picco_c, 1)],
+            # STEP 7 — Accumulo riga di riepilogo
+            summary_rows.append({
+                'GrOm':      grp_name,
+                'Lex8h':     round(lex8h,     1),
+                'U':         round(U_val,     1),
+                'Lex_max':   round(lex_max,   1),
+                'L_picco_C': round(l_picco_c, 1),
             })
 
-            csv_path  = os.path.join(output_dir, f'VR8h_{grp_name}.csv')
-            xlsx_path = os.path.join(output_dir, f'VR8h_{grp_name}.xlsx')
+            # STEP 8 — File di dettaglio per il gruppo: ID, LeqA, LeqC, U, Ti
+            df_detail = grp[['ID', 'LeqA', 'LeqC', 'U', 'Ti']].reset_index(drop=True)
+            detail_csv  = os.path.join(output_dir, f'VR8h_{grp_name}.csv')
+            detail_xlsx = os.path.join(output_dir, f'VR8h_{grp_name}.xlsx')
 
             # Check sull'esistenza della directory
             if not os.path.exists(output_dir):
                 os.makedirs(output_dir)
                 print(f'-- {output_dir} created --')
-                
-            df_out.to_csv(csv_path,   index=True)
-            df_out.to_excel(xlsx_path, index=True)
+
+            df_detail.to_csv(detail_csv,   index=True)
+            df_detail.to_excel(detail_xlsx, index=True)
 
             print('\n\n')
             print(f'Gruppo {grp_name}: \nLex8h={round(lex8h,1)} dB(A)\n'
                   f'U={round(U_val,1)} dB \nLex_max={round(lex_max,1)} dB(A)\n'
                   f'L_picco_C={round(l_picco_c,1)} dB(C)')
 
+
+        # ----------------------------------------------------------------
+        # STEP 9 — File riepilogativo unico VR8h.csv e VR8h.xlsx
+        # ----------------------------------------------------------------
+        df_summary = pd.DataFrame(summary_rows)
+        df_summary.to_csv( os.path.join(output_dir, 'VR8h.csv'),  index=True)
+        df_summary.to_excel(os.path.join(output_dir, 'VR8h.xlsx'), index=True)
+
         print(f'\n###\nanalisi_8h completata.\nDati salvati in {output_dir}\n###')
+
 
     def VR_8h(self,df_avg_dir):
             '''
