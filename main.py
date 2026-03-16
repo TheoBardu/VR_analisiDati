@@ -31,7 +31,9 @@ def main(main_directory):
     a = analisi(data_folder)
     df_avg = a.average_values() #creazione delle medie delle misure
     # # print(df_avg)
-
+    
+    # Copio le info dei GrOm e Ti dal file excel
+    a.get_scheda_info(df_avg, excel_info=main_directory)     
 
     str_print_4input = '''
     §§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§
@@ -43,6 +45,7 @@ def main(main_directory):
     '''
     input(str_print_4input)
 
+    
     
 
     # ==========================================================================

@@ -677,7 +677,7 @@ class analisi:
         
 
 
-
+    # prende i valori raw e crea un 
     def average_values(self):
         '''
         Funzione che concatena i dataframe di tutte le misure e scrive un file completo con le medie
@@ -737,9 +737,9 @@ class analisi:
                 df_avg = pd.concat([df_avg,new_df], ignore_index=True)
             
             
-            df_avg['Ti'] = [[10,10]] * len(df_avg) #creo la colonna con i valori di exposure time
-            df_avg['GrOm'] = [["M1","M2"]] * len(df_avg) #creo la colonna con gli ID del gruppo omogeneo
-            df_avg['DPI'] = [[False,True]] * len(df_avg) #creo la colonna contenente il riferimento all'uso del DPI
+            df_avg['Ti'] = [[]] * len(df_avg) #creo la colonna con i valori di exposure time
+            df_avg['GrOm'] = [[]] * len(df_avg) #creo la colonna con gli ID del gruppo omogeneo
+            df_avg['DPI'] = [[]] * len(df_avg) #creo la colonna contenente il riferimento all'uso del DPI
 
 
             files.write_csv(df_avg, self.main_dir + '/averaged_data.csv')
@@ -751,7 +751,209 @@ class analisi:
             print('File averaged.csv already exists!')
             df_avg = pd.read_csv(self.main_dir + '/averaged_data.csv')
             return df_avg
-            
+
+    
+    def get_scheda_info(self, df_avg, excel_info=None):
+        '''
+        Funzione che legge il file excel "scheda_gruppi_dpi.xlsx" e popola le colonne
+        GrOm e Ti del dataframe df_avg con i valori dei gruppi omogenei e dei tempi
+        di esposizione per ciascuna misura.
+
+        La funzione va chiamata DOPO average_values() e PRIMA di VR_8h().
+        Sostituisce il passaggio manuale di inserimento di GrOm e Ti in averaged_data.csv.
+
+        INPUT:
+            df_avg     = <pd.DataFrame>, dataframe con i valori medi delle misure,
+                         output di average_values(). Deve contenere almeno la colonna 'ID'
+                         (es. 'F4', 'D3', 'E1', ...) e le colonne 'GrOm' e 'Ti'.
+            excel_info = <str>, percorso completo del file excel con la scheda dei gruppi
+                         omogenei. Default: main_directory + "/scheda_gruppi_dpi.xlsx"
+                         (una directory sopra self.main_dir, che corrisponde a data_folder).
+
+        OUTPUT:
+            df_avg = <pd.DataFrame>, stesso dataframe in input con le colonne aggiornate:
+                     - 'GrOm': lista di stringhe con gli ID_GrOm di tutti i gruppi
+                                omogenei in cui compare la misura (es. ['M_01', 'M_03'])
+                     - 'Ti'  : lista di interi con i tempi di esposizione [min] per
+                                ciascun gruppo omogeneo (es. [90, 120])
+                     Il dataframe aggiornato viene salvato sovrascrivendo
+                     averaged_data.csv e averaged_data.xlsx nella cartella self.main_dir.
+
+        RAISES:
+            ValueError: se una mansione presente nel foglio 'Gruppi_omogenei' non ha
+                        corrispondenza nel foglio 'Scheda_mansioni'.
+            ValueError: se un ID presente in df_avg non compare in nessun gruppo
+                        omogeneo nel foglio 'Gruppi_omogenei'.
+            FileNotFoundError: se il file excel_info non esiste al percorso specificato.
+        '''
+        import openpyxl
+        from os.path import dirname, exists
+
+        # ------------------------------------------------------------------
+        # Variabili interne (modificabili facilmente)
+        # ------------------------------------------------------------------
+        sheet_gruppi   = 'Gruppi_omogenei'   # nome foglio gruppi omogenei
+        sheet_mansioni = 'Scheda_mansioni'    # nome foglio scheda mansioni
+
+        # Percorsi di output (sovrascrittura dei file averaged_data)
+        out_csv  = self.main_dir + '/averaged_data.csv'
+        out_xlsx = self.main_dir + '/averaged_data.xlsx'
+
+        # Percorso default del file excel: una directory sopra self.main_dir
+        # (corrisponde a main_directory, dato che self.main_dir = main_directory/data)
+        if excel_info is None:
+            excel_info = dirname(self.main_dir) + '/scheda_gruppi_dpi.xlsx'
+        else:
+            excel_info = excel_info + '/scheda_gruppi_dpi.xlsx'  # usa il percorso specificato in input
+
+        # ------------------------------------------------------------------
+        # Verifica esistenza file excel
+        # ------------------------------------------------------------------
+        if not exists(excel_info):
+            raise FileNotFoundError(
+                f"File excel non trovato: '{excel_info}'\n"
+                f"Controlla che il file 'scheda_gruppi_dpi.xlsx' sia presente in: "
+                f"'{dirname(excel_info)}'"
+            )
+
+        print(f'Lettura file scheda gruppi: {excel_info}')
+        wb = openpyxl.load_workbook(excel_info, data_only=True)
+
+        # ==================================================================
+        # STEP 1 — Lettura foglio 'Scheda_mansioni'
+        # Costruisce dizionario lookup: {Descrizione_GrOm -> ID_GrOm}
+        # Header in riga 2, dati da riga 3 in avanti.
+        # ==================================================================
+        ws_mansioni = wb[sheet_mansioni]
+
+        lookup_mansioni = {}  # { 'Addetto lavaggio': 'M_01', ... }
+        for row in ws_mansioni.iter_rows(min_row=3, values_only=True):
+            id_grom    = row[0]   # colonna A: ID_GrOm   (es. 'M_01')
+            descrizione = row[1]  # colonna B: Descrizione_GrOm (es. 'Addetto lavaggio')
+            if id_grom is not None and descrizione is not None:
+                lookup_mansioni[str(descrizione).strip()] = str(id_grom).strip()
+
+        print(f'Lookup mansioni caricato ({len(lookup_mansioni)} voci): {lookup_mansioni}')
+
+        # ==================================================================
+        # STEP 2 — Parsing foglio 'Gruppi_omogenei'
+        # Costruisce df_grom con colonne: [ID_misura, ID_GrOm, Descrizione, Ti]
+        #
+        # Struttura del foglio:
+        #   Riga 1-2 : titolo/vuote
+        #   Riga 3   : nomi mansioni nelle colonne dispari (A, C, E, ...)
+        #              es. ('Addetto lavaggio', None, 'Adetto sollevamento', None, ...)
+        #   Riga 4   : header 'ID', 'Ti', 'ID', 'Ti', ... (ripetuto per ogni gruppo)
+        #   Righe 5+ : dati (ID_misura, Ti) per ogni gruppo
+        # ==================================================================
+        ws_gruppi = wb[sheet_gruppi]
+        all_rows  = list(ws_gruppi.iter_rows(values_only=True))
+
+        row_mansioni = all_rows[2]  # riga 3 (0-indexed -> indice 2)
+        data_rows    = all_rows[4:] # righe dati da riga 5 in avanti (indice 4+)
+
+        n_cols  = len(row_mansioni)
+        n_groups = n_cols // 2  # ogni gruppo occupa 2 colonne: ID e Ti
+
+        df_grom_rows = []
+
+        for g in range(n_groups):
+            col_id = g * 2        # indice colonna ID
+            col_ti = g * 2 + 1   # indice colonna Ti
+
+            mansione_nome = row_mansioni[col_id]
+            if mansione_nome is None:
+                continue  # colonna vuota: nessun gruppo definito, si passa al prossimo
+
+            mansione_nome = str(mansione_nome).strip()
+
+            # Ricerca ID_GrOm nel dizionario di lookup
+            if mansione_nome not in lookup_mansioni:
+                raise ValueError(
+                    f"Mansione '{mansione_nome}' (foglio '{sheet_gruppi}', gruppo {g+1}) "
+                    f"non trovata nel foglio '{sheet_mansioni}'.\n"
+                    f"Verifica che il nome sia identico nella colonna 'Descrizione_GrOm'.\n"
+                    f"Voci disponibili: {list(lookup_mansioni.keys())}"
+                )
+
+            id_grom = lookup_mansioni[mansione_nome]
+
+            # Lettura righe dati per questo gruppo
+            for data_row in data_rows:
+                id_misura = data_row[col_id]
+                ti_val    = data_row[col_ti]
+
+                if id_misura is None:
+                    continue  # riga vuota per questo gruppo
+
+                df_grom_rows.append({
+                    'ID_misura':   str(id_misura).strip(),
+                    'ID_GrOm':     id_grom,
+                    'Descrizione': mansione_nome,
+                    'Ti':          int(ti_val)
+                })
+
+        df_grom = pd.DataFrame(df_grom_rows, columns=['ID_misura', 'ID_GrOm', 'Descrizione', 'Ti'])
+        print(f'df_grom costruito con {len(df_grom)} righe:')
+        print(df_grom.to_string(index=False))
+
+        # ==================================================================
+        # STEP 3 — Popolamento colonne GrOm e Ti in df_avg
+        #
+        # NOTA: le colonne GrOm e Ti in df_avg sono inizializzate da average_values()
+        # come interi (dtype int64). Prima di assegnare liste occorre forzare
+        # il tipo a object, altrimenti pandas lancia TypeError.
+        # ==================================================================
+        df_avg['GrOm'] = df_avg['GrOm'].astype(object)
+        df_avg['Ti']   = df_avg['Ti'].astype(object)
+        #
+        # Per ogni riga di df_avg (identificata da colonna 'ID'):
+        #   - cerca tutte le occorrenze di quell'ID in df_grom
+        #   - scrive la lista degli ID_GrOm in df_avg['GrOm']
+        #   - scrive la lista dei Ti in df_avg['Ti']
+        # Se un ID non è trovato in nessun gruppo -> Warning
+
+        missing_ids = []
+
+        for idx, row in df_avg.iterrows():
+            id_misura = str(row['ID']).strip()
+
+            # Filtra df_grom per trovare tutti i gruppi che contengono questa misura
+            matches = df_grom[df_grom['ID_misura'] == id_misura]
+
+            if matches.empty:
+                missing_ids.append(id_misura)
+                continue  # lascia GrOm e Ti invariati per questa riga, prosegue
+
+
+            # Scrivi le liste nelle colonne GrOm e Ti
+            df_avg.at[idx, 'GrOm'] = matches['ID_GrOm'].tolist()
+            df_avg.at[idx, 'Ti']   = matches['Ti'].tolist()
+
+        print('\nPopolamento GrOm e Ti completato.')
+        print(df_avg[['ID', 'GrOm', 'Ti']].to_string(index=False))
+
+            # Warning finale non bloccante per le misure non trovate
+        if missing_ids:
+            print(
+                f'\n*** WARNING: Le seguenti misure di df_avg non sono state trovate '
+                f'in nessun gruppo omogeneo nel file:\n'
+                f'    {excel_info}\n'
+                f'    Misure mancanti: {missing_ids}\n'
+                f'    Le colonne GrOm e Ti di queste righe sono rimaste invariate.\n'
+                f'    Verifica che gli ID siano presenti nel foglio "{sheet_gruppi}".\n'
+                f'    ID disponibili in df_grom: {sorted(df_grom["ID_misura"].unique().tolist())}\n'
+                f'***'
+            )
+
+        # ==================================================================
+        # STEP 4 — Salvataggio (sovrascrittura averaged_data.csv e .xlsx)
+        # ==================================================================
+        files.write_csv(df_avg, out_csv)
+        files.write_exel(df_avg, out_xlsx)
+        print(f'\nFile aggiornati salvati:\n  CSV  -> {out_csv}\n  XLSX -> {out_xlsx}')
+
+        return df_avg
 
 
     def calcolo_Leq8h(self, df_GrOm, T0 = 480):
