@@ -33,7 +33,7 @@ def main(main_directory):
     # # print(df_avg)
     
     # Copio le info dei GrOm e Ti dal file excel
-    a.get_scheda_info(df_avg, excel_info=main_directory)     
+    a.get_scheda_info(df_avg, excel_info_dir=main_directory)     
 
     str_print_4input = '''
     §§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§
@@ -50,10 +50,12 @@ def main(main_directory):
 
     # ==========================================================================
     # Valutazione Rischio 8 h =====================================
-    
+    # ==========================================================================
     a.analisi_8h(main_directory + risultati_directory, df_avg)
     
+
     
+    # Vecchia Funzione
     # a.VR_8h(data_folder + '/averaged_data.csv')
     # a.DPI_HML(data_folder, H = 36.4, M =35.8, L = 33.8, beta = 0.5, grom = [1,2,3,4]) 
 

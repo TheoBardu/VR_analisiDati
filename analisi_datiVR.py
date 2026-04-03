@@ -753,7 +753,7 @@ class analisi:
             return df_avg
 
     
-    def get_scheda_info(self, df_avg, excel_info=None):
+    def get_scheda_info(self, df_avg, excel_info_dir=None, name_exel_info="scheda_gruppi_dpi.xlsx"):
         '''
         Funzione che legge il file excel "scheda_gruppi_dpi.xlsx" e popola le colonne
         GrOm e Ti del dataframe df_avg con i valori dei gruppi omogenei e dei tempi
@@ -801,23 +801,23 @@ class analisi:
 
         # Percorso default del file excel: una directory sopra self.main_dir
         # (corrisponde a main_directory, dato che self.main_dir = main_directory/data)
-        if excel_info is None:
-            excel_info = dirname(self.main_dir) + '/scheda_gruppi_dpi.xlsx'
+        if excel_info_dir is None:
+            excel_info_dir = dirname(self.main_dir) + ''
         else:
-            excel_info = excel_info + '/scheda_gruppi_dpi.xlsx'  # usa il percorso specificato in input
+            excel_info_dir = excel_info_dir + '/' + name_exel_info  # usa il percorso specificato in input
 
         # ------------------------------------------------------------------
         # Verifica esistenza file excel
         # ------------------------------------------------------------------
-        if not exists(excel_info):
+        if not exists(excel_info_dir):
             raise FileNotFoundError(
-                f"File excel non trovato: '{excel_info}'\n"
-                f"Controlla che il file 'scheda_gruppi_dpi.xlsx' sia presente in: "
-                f"'{dirname(excel_info)}'"
+                f"File excel non trovato: '{excel_info_dir}'\n"
+                f"Controlla che il file {name_exel_info} sia presente in: "
+                f"'{dirname(excel_info_dir)}'"
             )
 
-        print(f'Lettura file scheda gruppi: {excel_info}')
-        wb = openpyxl.load_workbook(excel_info, data_only=True)
+        print(f'Lettura file scheda gruppi: {excel_info_dir}')
+        wb = openpyxl.load_workbook(excel_info_dir, data_only=True)
 
         # ==================================================================
         # STEP 1 — Lettura foglio 'Scheda_mansioni'
@@ -938,7 +938,7 @@ class analisi:
             print(
                 f'\n*** WARNING: Le seguenti misure di df_avg non sono state trovate '
                 f'in nessun gruppo omogeneo nel file:\n'
-                f'    {excel_info}\n'
+                f'    {excel_info_dir}\n'
                 f'    Misure mancanti: {missing_ids}\n'
                 f'    Le colonne GrOm e Ti di queste righe sono rimaste invariate.\n'
                 f'    Verifica che gli ID siano presenti nel foglio "{sheet_gruppi}".\n'
@@ -955,7 +955,7 @@ class analisi:
 
         return df_avg
 
-
+    #DEPRECATED, sostituita da analisi_8h()
     def calcolo_Leq8h(self, df_GrOm, T0 = 480):
         '''
         funzione che calcola il livello equivalente nelle 8h
