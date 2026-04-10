@@ -383,7 +383,80 @@ class files:
         '''
         df.to_excel(file, index=False)
         print('Salvataggio del file exel completato')
-        
+
+
+    def get_scheda_DPI(excel_info_dir, name_excel_info, sheet_name='Scheda_DPI'):
+        '''
+        Funzione che legge il foglio "Scheda_DPI" del file excel informativo e restituisce
+        un dataframe pandas con i dati dei dispositivi di protezione individuale (DPI).
+
+        INPUT:
+            excel_info_dir   = <str>, directory in cui è salvato il file excel informativo
+            name_excel_info  = <str>, nome del file excel informativo (es. 'scheda_gruppi_dpi.xlsx')
+            sheet_name       = <str>, nome del foglio da leggere (default: 'Scheda_DPI')
+
+        OUTPUT:
+            df_dpi = <pd.DataFrame>, dataframe con le seguenti colonne:
+                - codice_dpi  : codice identificativo del DPI (str)
+                - descrizione : descrizione del DPI (str)
+                - marca       : marca del DPI (str)
+                - modello     : modello del DPI (str)
+                - SNR         : valore SNR del DPI (float)
+                - H           : valore di attenuazione alle alte frequenze (float)
+                - L           : valore di attenuazione alle basse frequenze (float)
+                - M           : valore di attenuazione alle medie frequenze (float)
+                - beta        : coefficiente correttivo per l'attenuazione reale (float)
+        '''
+        import os
+        import warnings
+
+        file_path = os.path.join(excel_info_dir, name_excel_info)
+
+        try:
+            # Leggo il foglio saltando la riga del titolo (riga 1),
+            # usando la riga 2 come intestazione e i dati dalla riga 3 in avanti
+            df_raw = pd.read_excel(
+                file_path,
+                sheet_name=sheet_name,
+                skiprows=1,   # salta la riga del titolo "Tabella DPI"
+                header=0      # usa la riga successiva come intestazione
+            )
+
+            # Rinomino le colonne secondo la convenzione richiesta
+            col_map = {
+                df_raw.columns[0]: 'codice_dpi',
+                df_raw.columns[1]: 'descrizione',
+                df_raw.columns[2]: 'marca',
+                df_raw.columns[3]: 'modello',
+                df_raw.columns[4]: 'SNR',
+                df_raw.columns[5]: 'H',
+                df_raw.columns[6]: 'L',
+                df_raw.columns[7]: 'M',
+                df_raw.columns[8]: 'beta',
+            }
+            df_dpi = df_raw.rename(columns=col_map)
+
+            # Forzo i tipi di dato
+            str_cols   = ['codice_dpi', 'descrizione', 'marca', 'modello']
+            float_cols = ['SNR', 'H', 'L', 'M', 'beta']
+
+            for col in str_cols:
+                df_dpi[col] = df_dpi[col].astype(str).replace('nan', None)
+
+            for col in float_cols:
+                df_dpi[col] = pd.to_numeric(df_dpi[col], errors='coerce')
+
+            # Messaggio di conferma con elenco marca-modello
+            print('Lettura scheda DPI avvenuta con successo. Verifica la correttezza dei dati:')
+            for _, row in df_dpi.iterrows():
+                print(f'  [{row["codice_dpi"]}]  Marca: {row["marca"]}  -  Modello: {row["modello"]}')
+
+            return df_dpi
+
+        except Exception as e:
+            warnings.warn(f'Lettura file excel non avvenuta con successo. Errore: {e}')
+            return None
+
 
 
     def read_csv(file):
@@ -1128,8 +1201,8 @@ class analisi:
         # STEP 9 — File riepilogativo unico VR8h.csv e VR8h.xlsx
         # ----------------------------------------------------------------
         df_summary = pd.DataFrame(summary_rows)
-        df_summary.to_csv( os.path.join(output_dir, 'VR8h.csv'),  index=True)
-        df_summary.to_excel(os.path.join(output_dir, 'VR8h.xlsx'), index=True)
+        df_summary.to_csv( os.path.join(output_dir, 'VR8h_totale.csv'),  index=True)
+        df_summary.to_excel(os.path.join(output_dir, 'VR8h_totale.xlsx'), index=True)
 
         print(f'\n###\nanalisi_8h completata.\nDati salvati in {output_dir}\n###')
 
@@ -1271,7 +1344,163 @@ class analisi:
         exel_file.color_cell_VR8h(VR_8h_dir + '/VR_8h.xlsx')
 
 
+    def applica_DPI_HML(self, excel_info_dir, name_excel_info, output_directory, output_dpi, mode = 'both'):
+        '''
+        Funzione che applica il metodo HML per il calcolo dell'attenuazione dei DPI
+        su tutti i file CSV presenti in output_directory e salva i risultati per ogni DPI
+        in sottocartelle dedicate dentro output_dpi.
 
+        Per ogni DPI definito nella scheda e per ogni file CSV del gruppo omogeneo:
+            1. Legge i parametri H, L, M, beta e calcola H' = beta*H, L' = beta*L, M' = beta*M
+            2. Calcola diff_C_A = LeqC - LeqA riga per riga
+            3. Calcola PNR con metodo HML:
+                - se diff_C_A <= 2 : PNR = M' - (H'-M')/4  * (diff_C_A - 2)
+                - se diff_C_A >  2 : PNR = M' - (H'-L')/8  * (diff_C_A - 2)
+            4. Aggiunge colonne PNR e LeqA_rid = LeqA - PNR
+            5. Salva il file (csv + xlsx) nella cartella output_dpi/DPI_i/
+            6. Colora le celle di LeqA_rid nel file xlsx in base al livello di rischio:
+                < 65            : arancione  (#FF8C00)
+                65 <= v <= 70   : giallo sc. (#FFD700)
+                75 <= v <= 80   : giallo sc. (#FFD700)
+                70 <  v < 75   : verde      (#008000)
+                > 80            : rosso      (#DC143C)
+
+        INPUT:
+            excel_info_dir   = <str>, directory del file excel con la scheda DPI
+            name_excel_info  = <str>, nome del file excel con la scheda DPI
+            output_directory = <str>, directory contenente i file CSV dei gruppi omogenei
+            output_dpi       = <str>, directory radice in cui creare le sottocartelle DPI_i
+            mode             = <str>, xlsx per salvare in excel, csv per salvare in csv o both per salvare entrmabi
+
+        OUTPUT:
+            Nessun valore di ritorno. I file vengono salvati su disco.
+        '''
+        import glob
+        import os
+        import re
+        import numpy as np
+        import openpyxl as ex
+        from openpyxl.styles import PatternFill
+        from openpyxl.utils import get_column_letter
+
+        # ── Step 1: leggi la scheda DPI ──────────────────────────────────────────
+        df_dpi = files.get_scheda_DPI(excel_info_dir, name_excel_info)
+        if df_dpi is None:
+            print('Errore: impossibile leggere la scheda DPI. Controlla che esista nella directory. Funzione interrotta.')
+            return
+
+        # ── Step 2: lista CSV da processare ──────────────────────────────────────
+        ESCLUSI = {'VR8h.csv', 'VR8h.xlsx'}
+        csv_files = sorted([
+            f for f in glob.glob(os.path.join(output_directory, '*.csv'))
+            if os.path.basename(f) not in ESCLUSI
+        ])
+
+        if not csv_files:
+            print(f'Nessun file CSV trovato in: {output_directory}')
+            return
+
+        # ── Step 3 + 4: itera su DPI e su file CSV ───────────────────────────────
+        for _, dpi_row in df_dpi.iterrows():
+
+            # Estrae il numero identificativo dal codice_dpi (es. "DPI1" -> 1)
+            match = re.search(r'\d+', str(dpi_row['codice_dpi']))
+            if not match:
+                print(f'Codice DPI non riconosciuto: {dpi_row["codice_dpi"]} — riga saltata.')
+                continue
+            dpi_idx = match.group()
+
+            # Parametri HML con coefficiente correttivo beta
+            beta = float(dpi_row['beta'])
+            Hp   = beta * float(dpi_row['H'])
+            Mp   = beta * float(dpi_row['M'])
+            Lp   = beta * float(dpi_row['L'])
+
+            # Crea la cartella di output per questo DPI
+            dpi_folder = os.path.join(output_dpi, f'DPI_{dpi_idx}')
+            os.makedirs(dpi_folder, exist_ok=True)
+
+            print(f'\n── DPI_{dpi_idx} | {dpi_row["marca"]} {dpi_row["modello"]} '
+                  f'| β={beta}  H\'={Hp:.2f}  M\'={Mp:.2f}  L\'={Lp:.2f} ──')
+
+            for csv_path in csv_files:
+                df = pd.read_csv(csv_path)
+
+                # ── Calcolo PNR vettorializzato ───────────────────────────────
+                diff_C_A = df['LeqC'] - df['LeqA']
+
+                PNR = np.where(
+                    diff_C_A <= 2,
+                    Mp - (Hp - Mp) / 4 * (diff_C_A - 2),   # diff <= 2
+                    Mp - (Hp - Lp) / 8 * (diff_C_A - 2)    # diff >  2
+                )
+
+                df['PNR']      = PNR.round(1)
+                df['LeqA_rid'] = (df['LeqA'] - df['PNR']).round(1)
+
+                # ── Nomi file di output ───────────────────────────────────────
+                base_name = os.path.basename(csv_path)           # es. VR8h_M_01.csv
+                stem, _   = base_name.rsplit('.', 1)             # es. VR8h_M_01
+                out_stem  = f'{stem}_dpi_{dpi_idx}'              # es. VR8h_M_01_dpi_1
+                out_csv   = os.path.join(dpi_folder, out_stem + '.csv')
+                out_xlsx  = os.path.join(dpi_folder, out_stem + '.xlsx')
+
+                # ── Salvataggio CSV ───────────────────────────────────────────
+                if mode == 'both' or mode == 'csv':
+                    files.write_csv(df, out_csv)
+
+                # ── Salvataggio XLSX ──────────────────────────────────────────
+                if mode == 'both' or mode == 'xlsx':
+                    files.write_exel(df, out_xlsx)
+
+                # ── Colorazione celle LeqA_rid ────────────────────────────────
+                wb = ex.load_workbook(out_xlsx)
+                ws = wb.active
+
+                # Trova la lettera della colonna LeqA_rid
+                leqa_rid_col = None
+                for cell in ws[1]:
+                    if cell.value == 'LeqA_rid':
+                        leqa_rid_col = get_column_letter(cell.column)
+                        break
+
+                if leqa_rid_col is None:
+                    print(f'  ATTENZIONE: colonna LeqA_rid non trovata in {out_xlsx}')
+                    wb.save(out_xlsx)
+                    continue
+
+                # Mappa colori per livello di rischio
+                def _get_color(val):
+                    if val < 65:
+                        return 'FF8C00'   # arancione  – iperprotezione
+                    elif val > 80:
+                        return 'DC143C'   # rosso      – insufficiente
+                    elif 65 <= val <= 70 or 75 <= val <= 80:
+                        return 'FFD700'   # giallo sc. – accettabile
+                    elif 70 < val < 75:
+                        return '008000'   # verde      – buona protezione
+                    return None           # nessuna colorazione (non dovrebbe accadere)
+
+                for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
+                    for cell in row:
+                        if get_column_letter(cell.column) == leqa_rid_col \
+                                and cell.value is not None:
+                            try:
+                                color = _get_color(float(cell.value))
+                                if color:
+                                    cell.fill = PatternFill(
+                                        start_color=color,
+                                        end_color=color,
+                                        fill_type='solid'
+                                    )
+                            except (TypeError, ValueError):
+                                pass
+
+                wb.save(out_xlsx)
+                print(f'  Salvato: {out_csv}')
+                print(f'  Salvato: {out_xlsx}')
+
+        print('\nApplicazione DPI HML completata.')
 
 
                 
