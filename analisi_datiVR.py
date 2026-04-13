@@ -1390,7 +1390,7 @@ class analisi:
             return
 
         # ── Step 2: lista CSV da processare ──────────────────────────────────────
-        ESCLUSI = {'VR8h.csv', 'VR8h.xlsx'}
+        ESCLUSI = {'VR8h_totale.csv', 'VR8h_totale.xlsx'}
         csv_files = sorted([
             f for f in glob.glob(os.path.join(output_directory, '*.csv'))
             if os.path.basename(f) not in ESCLUSI
@@ -1502,8 +1502,173 @@ class analisi:
 
         print('\nApplicazione DPI HML completata.')
 
+    def applica_dpi_HLM_8h(self, main_dir, dpi_dir, total_VR8h_name = "VR8h_totale"):
+        '''
+        Funzione che calcola il livello di esposizione giornaliero ridotto (LEX,8h) con DPI
+        per ogni gruppo omogeneo, applicando il metodo HML a partire dai file prodotti da
+        applica_DPI_HML(), e aggiorna il file riassuntivo VR8h_totale.
 
-                
+        Per ogni DPI (directory DPI_i dentro dpi_dir) e per ogni file xlsx in essa contenuto,
+        calcola:
+            LeqA_rid_medio = 10 * log10( sum( Ti/480 * 10^(LeqA_rid/10) ) )   [dB(A)]
+            PNR_medio      = media aritmetica della colonna PNR
+
+        e li assegna alla riga corrispondente al gruppo omogeneo nel file VR8h_totale.
+
+        Al termine colora di verde (#008000) la cella con il valore minimo di
+        LeqA_rid_medio_DPI_i per ogni riga (gruppo omogeneo), indicando il DPI
+        più performante.
+
+        INPUT:
+            main_dir         = <str>, directory di lavoro principale; contiene
+                               VR8h_totale.csv e riceverà VR8h_totale_dpi.xlsx
+            total_VR8h_name  = <str>, nome base del file csv riassuntivo (senza estensione),
+                               es. 'VR8h_totale'
+            dpi_dir          = <str>, directory che contiene le sottocartelle DPI_1, DPI_2, ...
+                               prodotte da applica_DPI_HML()
+
+        OUTPUT:
+            Nessun valore di ritorno. Salva VR8h_totale_dpi.xlsx in main_dir.
+        '''
+        import glob
+        import os
+        import re
+        import warnings
+        import numpy as np
+        import openpyxl as ex
+        from openpyxl.styles import PatternFill
+        from openpyxl.utils import get_column_letter
+
+        # ── Identifica le directory DPI in dpi_dir ────────────────────────────
+        numero_dpi = sorted([
+            d for d in os.listdir(dpi_dir)
+            if os.path.isdir(os.path.join(dpi_dir, d))
+        ])
+
+        if not numero_dpi:
+            print(f'Nessuna directory DPI trovata in: {dpi_dir}')
+            return
+
+        print(f'Directory DPI trovate ({len(numero_dpi)}): {numero_dpi}')
+
+        # ── Carica VR8h_totale.csv ────────────────────────────────────────────
+        tot_csv_path = os.path.join(main_dir, total_VR8h_name + '.csv')
+        try:
+            df_vr8h = files.read_csv(tot_csv_path)
+        except Exception as e:
+            print(f'Errore nel caricamento di {tot_csv_path}: {e}')
+            return
+
+        # ── Inizializza colonne PNR_medio e LeqA_rid_medio per ogni DPI ──────
+        for dpi_name in numero_dpi:
+            df_vr8h[f'PNR_medio_{dpi_name}']      = np.nan
+            df_vr8h[f'LeqA_rid_medio_{dpi_name}'] = np.nan
+
+        # ── Itera su ogni directory DPI ───────────────────────────────────────
+        for dpi_name in numero_dpi:
+
+            if not re.search(r'\d+', dpi_name):
+                warnings.warn(f'Indice DPI non riconoscibile da: {dpi_name} — directory saltata.')
+                continue
+
+            dpi_folder = os.path.join(dpi_dir, dpi_name)
+            xlsx_files = sorted(glob.glob(os.path.join(dpi_folder, '*.xlsx')))
+
+            if not xlsx_files:
+                print(f'  Nessun file xlsx trovato in: {dpi_folder}')
+                continue
+
+            print(f'\n── {dpi_name}: {len(xlsx_files)} file xlsx trovati ──')
+
+            for xlsx_path in xlsx_files:
+                fname = os.path.basename(xlsx_path)
+
+                # Estrae nome_gruppo_omogeneo dal nome file:
+                # formato atteso: VR8h_<grom>_dpi_<i>.xlsx
+                m = re.search(r'VR8h_(.+)_dpi_\d+\.xlsx', fname)
+                if not m:
+                    warnings.warn(
+                        f'Formato nome file non riconosciuto: {fname} — file saltato.'
+                    )
+                    continue
+                grom_name = m.group(1)
+
+                # Carica il file xlsx
+                try:
+                    df_xlsx = pd.read_excel(xlsx_path)
+                except Exception as e:
+                    warnings.warn(f'Errore nel caricamento di {fname}: {e} — file saltato.')
+                    continue
+
+                # Calcolo LeqA_rid_medio (formula LEX,8h con DPI)
+                E_i = df_xlsx['Ti'] / 480 * 10 ** (df_xlsx['LeqA_rid'] / 10)
+                LeqA_rid_medio = round(10 * np.log10(E_i.sum()), 1)
+
+                # Calcolo PNR medio
+                PNR_medio = round(df_xlsx['PNR'].mean(), 1)
+
+                print(
+                    f'  {fname} | GrOm={grom_name} | '
+                    f'LeqA_rid_medio={LeqA_rid_medio} dB(A) | PNR_medio={PNR_medio} dB'
+                )
+
+                # Trova la riga corrispondente in VR8h_totale tramite GrOm
+                mask = df_vr8h['GrOm'] == grom_name
+                if not mask.any():
+                    warnings.warn(
+                        f'{grom_name} non trovato nel file VR8h_totale.csv'
+                    )
+                    continue
+
+                df_vr8h.loc[mask, f'LeqA_rid_medio_{dpi_name}'] = LeqA_rid_medio
+                df_vr8h.loc[mask, f'PNR_medio_{dpi_name}']      = PNR_medio
+
+        # ── Salva VR8h_totale_dpi.xlsx ────────────────────────────────────────
+        out_xlsx = os.path.join(main_dir, 'VR8h_totale_dpi.xlsx')
+        files.write_exel(df_vr8h, out_xlsx)
+        print(f'\nFile salvato: {out_xlsx}')
+
+        # ── Colorazione: verde (#008000) sulla cella minima di ogni riga ─────
+        leqa_rid_cols = [c for c in df_vr8h.columns if c.startswith('LeqA_rid_medio_')]
+
+        if not leqa_rid_cols:
+            print('Nessuna colonna LeqA_rid_medio trovata — colorazione saltata.')
+            return
+
+        wb = ex.load_workbook(out_xlsx)
+        ws = wb.active
+
+        # Mappa nome colonna -> lettera Excel
+        col_map = {}
+        for cell in ws[1]:
+            if cell.value in leqa_rid_cols:
+                col_map[cell.value] = get_column_letter(cell.column)
+
+        green_fill = PatternFill(start_color='008000', end_color='008000', fill_type='solid')
+
+        for row_idx in range(2, ws.max_row + 1):
+            # Raccoglie i valori LeqA_rid_medio della riga corrente
+            row_vals = {}
+            for col_name, col_letter in col_map.items():
+                val = ws[f'{col_letter}{row_idx}'].value
+                if val is not None:
+                    try:
+                        row_vals[col_letter] = float(val)
+                    except (TypeError, ValueError):
+                        pass
+
+            if not row_vals:
+                continue
+
+            # Colora di verde la cella con il valore minimo
+            min_col_letter = min(row_vals, key=row_vals.get)
+            ws[f'{min_col_letter}{row_idx}'].fill = green_fill
+
+        wb.save(out_xlsx)
+        print(f'Colorazione completata. Cella minima LeqA_rid_medio colorata di verde per ogni gruppo omogeneo.')
+        print('\napplica_dpi_HLM_8h completata.')
+
+
                 
                 
 

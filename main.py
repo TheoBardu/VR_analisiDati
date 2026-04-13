@@ -10,6 +10,7 @@ from analisi_datiVR import manager, analisi
 main_directory = '/Users/theo/Desktop/P.IVA/Ermes/Lavori/Ducati Energia'
 misure_directory = '/misure'
 risultati_directory = '/output'
+dpi_directory = '/DPI_check'
 
 
 def main(main_directory):
@@ -54,14 +55,27 @@ def main(main_directory):
     a.analisi_8h(main_directory + risultati_directory, df_avg)
     
 
+    # Applicazione medoto HLM per i DPI sulle misure singole
+    a.applica_DPI_HML(excel_info_dir=main_directory , 
+                      name_excel_info='scheda_gruppi_dpi.xlsx', 
+                      output_directory= main_directory + risultati_directory, 
+                      output_dpi= main_directory + risultati_directory + dpi_directory,
+                      mode = 'both')
     
-    # Vecchia Funzione
-    # a.VR_8h(data_folder + '/averaged_data.csv')
-    # a.DPI_HML(data_folder, H = 36.4, M =35.8, L = 33.8, beta = 0.5, grom = [1,2,3,4]) 
 
 
-    # sys.stdout.close()
-    # sys.stdout = sys.__stdout__
+
+
+    #Calcolo PNR medio e LeqA ridotto sulla mansione
+    a.applica_dpi_HLM_8h(main_dir=main_directory,
+                         dpi_dir=main_directory + risultati_directory + dpi_directory,
+                         total_VR8h_name="VR8h_totale")
+    
+
+    
+
+
+
 
 
 
