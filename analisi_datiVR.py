@@ -2,7 +2,9 @@ import pandas as pd
 import openpyxl as ex
 from openpyxl.styles import PatternFill
 from numpy import zeros, arange, mean, std, max, round, ones, log10, sum, dot, sqrt
-from os import chdir, getcwd, error
+from os import chdir, getcwd, error, path
+import re
+
 
 
 # file = '/Users/theo/Desktop/Ermes/Misure/misF/misF/LSOURCES - Copia.txt'
@@ -247,6 +249,9 @@ class files:
         elif format == 'csv':
             import glob 
             from numpy import average, min, max
+            
+            
+            print('Reading csv files only')
 
             #inizializzo il dataFrame pandas con il riassunto delle misure
             df_tot = pd.DataFrame(columns=['fileID','letter_ID','nTrack','LeqA_min','LeqA_max','LeqA_eq','LeqC_min','LeqC_max','LeqC_eq','PeakC_max','PeakC_eq','LASeq_T','LAIeq_T','durata','inizio','fine'])
@@ -271,8 +276,23 @@ class files:
             LAIeq_T = []
             
 
+            # Prima di procedere alla lettura dei csv, cerco dove sono i file nelle sottocartelle
+            all_subdirs = [
+                d for d in glob.glob('*')
+                if path.isdir(d) and re.search(r'_(\d+)$', d)
+            ]
+            # ordino i file in ordine crescente 0001, 0002, 0003, ...
+            all_subdirs.sort(key=lambda d: int(re.search(r'_(\d+)$', d).group(1)))
+            
+            # Per ogni sottocartella, raccoglie i CSV al suo interno (ordinati per nome)
+            csv_files = []
+            for subdir in all_subdirs:
+                found = sorted(glob.glob(path.join(subdir, '*.csv')))
+                csv_files.extend(found)
+         
 
-            print('Reading csv files only')
+            # Procedo alla creazione del dataframe ============
+
             csv_files = glob.glob('*.csv') # salvo la lista di tutti i file csv che ci sono
             csv_files.sort() # riordino per nome la lista dei file
 
