@@ -43,7 +43,7 @@ context = {
     "interazione_vib_rum": "Si", #presenza di interazione tra rumore e vibrazione
     "misure_attuative_vib_rum":"Certamente si considerato l’utilizzo di attrezzature elettriche portatili. Vi è dunque trasmissione ossea delle vibrazioni e del rumore all’orecchio medio. Si faccia riferimento alla valutazione del rischio chimico.", 
     "effetti_indesiderati": "Si",
-    "misure_attuative_effetto_indesiderati": "Nelle zone/postazioni di lavoro è possibile che gli addetti possano incorrere in tali situazioni. Si consiglia pertanto di utilizzare D.P.I. con grado di protezione SNR come prescritto dalla presente relazione e l’adozione di sistemi alternativi quali segnali oto-acustici.",
+    "misure_attuative_effetti_indesiderati": "Nelle zone/postazioni di lavoro è possibile che gli addetti possano incorrere in tali situazioni. Si consiglia pertanto di utilizzare D.P.I. con grado di protezione SNR come prescritto dalla presente relazione e l’adozione di sistemi alternativi quali segnali oto-acustici.",
     "descrizione_attivita_dettaglio":"boh", #dettaglio della mansione
 }
 

@@ -7,7 +7,7 @@ import sys
 from analisi_datiVR import manager, analisi
 
 # La main directory deve essere la root (quindi la cartella dell'azienda)
-main_directory = '/Users/theo/Desktop/P.IVA/Ermes/Lavori/Tecnoclima/rev/rev3'
+main_directory = '/Users/theo/Desktop/P.IVA/Aziende/Ermes/Lavori/Effedì Salotti/Rumore/REV/rev2'
 misure_directory = '/misure'
 risultati_directory = '/output'
 dpi_directory = '/DPI_check'
