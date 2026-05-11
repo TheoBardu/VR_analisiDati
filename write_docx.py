@@ -3,14 +3,15 @@ from docxtpl import InlineImage
 from docx.shared import Mm
 
 # VARIABILI GLOBALI E COSE DA IMPORTARE ============
-documento_word_template = "/Users/theo/Desktop/P.IVA/Ermes/Modelli/Modello_Relazione_RUM.docx"
-
-logo_azienda = ""
-width_logo = 50
+documento_word_template = "/Users/theo/Desktop/P.IVA/Aziende/Ermes/Modelli/Modello_Relazione_RUM.docx"
+OUTPUT_DOCUMENT = "/Users/theo/Desktop/Modello_Relazione_RUM_modificato.docx"
 
 
 # ===============================================
 doc = DocxTemplate(documento_word_template)
+
+logo_azienda = "/Users/theo/Desktop/1631305251718.jpeg"
+width_logo = 50
 
 context = {
     # Compila i campi vuoti
@@ -43,7 +44,7 @@ context = {
     "misure_attuative_vib_rum":"Certamente si considerato l’utilizzo di attrezzature elettriche portatili. Vi è dunque trasmissione ossea delle vibrazioni e del rumore all’orecchio medio. Si faccia riferimento alla valutazione del rischio chimico.", 
     "effetti_indesiderati": "Si",
     "misure_attuative_effetto_indesiderati": "Nelle zone/postazioni di lavoro è possibile che gli addetti possano incorrere in tali situazioni. Si consiglia pertanto di utilizzare D.P.I. con grado di protezione SNR come prescritto dalla presente relazione e l’adozione di sistemi alternativi quali segnali oto-acustici.",
-    "descrizione_attivita_dettaglio":"", #dettaglio della mansione
+    "descrizione_attivita_dettaglio":"boh", #dettaglio della mansione
 }
 
 # Dizionari separati per le tabelle
@@ -74,7 +75,7 @@ context_tabella_mansioni = {
     "tabella_mansioni_numero_lavoratori": [
         {
             "ID": "",
-            "Mansione": "",
+            "Mansione": " Nome mansione",
             "N_lavoratori" : ""
         }
     ],
@@ -103,5 +104,5 @@ context_tabella_heg = {
 context_completo = context | context_tabella_dpi | context_tabella_orari | context_tabella_mansioni | context_tabella_heg
 
 doc.render(context_completo)
-doc.save("/Users/theo/Downloads/Modello_Relazione_RUM.docx")
+doc.save(OUTPUT_DOCUMENT)
 print('Docx scritto')
