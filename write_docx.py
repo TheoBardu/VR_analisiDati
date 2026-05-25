@@ -16,7 +16,7 @@ width_logo = 50
 context = {
     # Compila i campi vuoti
     "nome_azienda": "PARESA S.R.L.", 
-    "indirizzo_azienda": "vicolo malvasia 980 (FC) dio can",
+    "indirizzo_azienda": "vicolo malvasia 980 (FC)",
     "note_titolo" : "relazione per la sede di mantova",
     "revisione": "rev.01",
     "data_revisione": "16/03/2026",
