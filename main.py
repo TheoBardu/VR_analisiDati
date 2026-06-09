@@ -7,7 +7,7 @@ import sys
 from analisi_datiVR import manager, analisi
 
 # La main directory deve essere la root (quindi la cartella dell'azienda)
-main_directory = '/Users/theo/Desktop/P.IVA/Aziende/Ermes/Lavori/SIT - RSM/rev2/Rumore'
+main_directory = '/Users/theo/Desktop/P.IVA/Aziende/Ermes/Lavori/RSPCT SRL/rev1/Rumore'
 misure_directory = '/misure'
 risultati_directory = '/output'
 dpi_directory = '/DPI_check'
@@ -71,9 +71,6 @@ def main(main_directory):
                          dpi_dir=main_directory + risultati_directory + dpi_directory,
                          total_VR8h_name="VR8h_totale")
     
-
-    
-
 
 
 

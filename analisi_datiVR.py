@@ -115,7 +115,7 @@ class files:
     Classe che serve per leggere e scrivere i file
     '''
 
-    def read_measure_file(file, letter_ID, format='txt',ntrack = 6, decimals = 1):
+    def read_measure_file(file, letter_ID, format='csv',ntrack = 6, decimals = 1):
         '''
         Funzione che legge il file di misura in txt o csv e restituisce un dataframe pandas.
 
@@ -382,6 +382,114 @@ class files:
 
             return df_tot
 
+        elif format == 'xlsx':
+            from numpy import average, min, max
+            from glob import glob
+            from config import SHEET_NAME_XLSX
+
+            
+            print('Reading xlsx files')
+            #inizializzo il dataFrame pandas con il riassunto delle misure
+            df_tot = pd.DataFrame(columns=['fileID','letter_ID','nTrack','LeqA_min','LeqA_max','LeqA_eq','LeqC_min','LeqC_max','LeqC_eq','PeakC_max','PeakC_eq','LASeq_T','durata','inizio','fine'])
+            
+            #Inizializzazione delle variabili di df_tot
+            fileIDs = []
+            letter_IDs = []
+            inizio = []
+            fine = []
+            durata = []
+            ntrack_id = []
+            LeqA_min = []
+            LeqA_max = []
+            LeqA_eq = []
+            LeqC_min = []
+            LeqC_max = []
+            LeqC_eq = []
+            PeakC_max = []
+            PeakC_eq = []
+            LASeq_T = []
+
+            #lista dei file che terminano con xlsx
+            files = glob('*.xlsx')
+            files.sort() #riordino i valori della lista in ordine crescente di orario
+            
+            #itero su tutti i file per estrarre i dati
+            letter_id_number = 1 #inizializzo il numero della misura ad 1 per ogni nuovo file misure ( in modo che d1,d2,d3...f1,f2,f3...)
+            for file in files:
+                # Carico e ripulisco il dataframe
+                df = pd.read_excel(file, sheet_name=SHEET_NAME_XLSX) #leggo il file
+                df.iloc[:,1] = pd.to_datetime(df.iloc[:,1], format='%Y-%m-%d  %H:%M:%S', errors='coerce')
+                df.dropna(subset=df.columns[2],inplace=True) #tolgo tutte le righe che sono NaN nella colonna LAeq
+                
+                
+                #identifico se la lunghezza della traccia può essere divisa perfettamente per il numero di tracce desiderate
+                n = (len(df)-1)%ntrack
+                if n == 0: #se può essere divisa perfettamente
+                    sep = int((len(df)-1)/ntrack)
+                else: #se non può essere divisa perfettamente
+                    df.drop(arange(n),inplace=True) #tolgo gli ultimi valori utili per avere una divisibilità buona
+                    df = df.reset_index(drop=True)
+                    sep = int((len(df)-1)/ntrack)
+                
+                
+                # Popolo il dataframe totale
+                ntrack_id_letter = 1 #variabile che mi tiene conto del numero di traccia di una misura (es: D1 track 1, D1 trak 2, D1 track 3, ...)
+                for i in range(ntrack):
+                    fileIDs.append(file) #salvo il nome del file 
+                    letter_IDs.append(letter_ID + str(letter_id_number)) #salvo la lettera del file
+                    ntrack_id.append(ntrack_id_letter)
+                    ntrack_id_letter += 1
+
+                    inizio.append(df[df.columns[1]][i + i * sep].time()) 
+                    fine.append(df[df.columns[1]][(i+1)*sep].time())
+                    
+                    # Durata
+                    dT = df[df.columns[1]][(i+1)*sep] - df[df.columns[1]][i + i * sep]
+                    dT_str = f"{dT.components[1]:02d}:{dT.components[2]:02d}:{dT.components[3]:02d}"
+                    durata.append(dT_str)
+
+
+                    #LeqA
+                    LeqA_min.append(round(min(df[df.columns[2]][0+i*int(sep):(i+1)*int(sep)]),decimals))
+                    LeqA_max.append(round(max(df[df.columns[2]][0+i*int(sep):(i+1)*int(sep)]),decimals))
+                    LeqA_eq.append(round(10*log10(sum(10**(df[df.columns[2]][0+i*int(sep):(i+1)*int(sep)]/10))/(len(df[df.columns[2]][0+i*int(sep):(i+1)*int(sep)])) ),decimals))
+                    # print(len(df['LAeq'][0+i*int(sep):(i+1)*int(sep)]))
+                    
+
+                    #LeqC
+                    LeqC_min.append(round(min(df[df.columns[4]][0+i*int(sep):(i+1)*int(sep)]),decimals))
+                    LeqC_max.append(round(max(df[df.columns[4]][0+i*int(sep):(i+1)*int(sep)]),decimals))
+                    LeqC_eq.append(round( 10*log10(sum(10**(df[df.columns[4]][0+i*int(sep):(i+1)*int(sep)]/10))/(len(df[df.columns[4]][0+i*int(sep):(i+1)*int(sep)])) ),decimals))
+
+                    PeakC_max.append(round(max(df[df.columns[3]][0+i*int(sep):(i+1)*int(sep)]),decimals))
+                    PeakC_eq.append(round(average(df[df.columns[3]][0+i*int(sep):(i+1)*int(sep)]),decimals))
+
+                    #LAeqS and LAeqI
+                    LASeq_T.append(round(10*log10(sum(10**(df[df.columns[5]][0+i*int(sep):(i+1)*int(sep)]/10))/(len(df[df.columns[5]][0+i*int(sep):(i+1)*int(sep)]))),decimals))
+
+                letter_id_number += 1
+            
+            df_tot['fileID'] = fileIDs
+            df_tot['letter_ID'] = letter_IDs
+            df_tot['nTrack'] = ntrack_id
+            df_tot['inizio'] = inizio
+            df_tot['fine'] = fine
+            df_tot['durata'] = durata
+            df_tot['LeqA_min'] = LeqA_min
+            df_tot['LeqA_max'] = LeqA_max
+            df_tot['LeqA_eq'] = LeqA_eq 
+            df_tot['LASeq_T'] = LASeq_T
+            df_tot['LeqC_min'] = LeqC_min
+            df_tot['LeqC_max'] = LeqC_max
+            df_tot['LeqC_eq'] = LeqC_eq
+            df_tot['PeakC_max'] = PeakC_max
+            df_tot['PeakC_eq'] = PeakC_eq
+
+            return df_tot
+
+
+
+
 
 
 
@@ -509,6 +617,8 @@ class manager:
         print(f'Directory di lavoro: {self.main_dir}') #stampa la directory di lavoro
 
         self.file_list = listdir(self.main_dir) #salva la lista dei file nella directory principale
+        self.file_list.sort() #riordino i file in ordine crescente
+
         # print(self.file_list)
         if ".DS_Store" in self.file_list:
             self.file_list.remove(".DS_Store")
@@ -536,6 +646,8 @@ class manager:
             format = <str>, formato file. Disponibili: 'txt' o 'csv'
         '''
         from os import path, mkdir
+        from config import READING_TXT_DATA_FOLDER_NAME, READING_CSV_DATA_FOLDER_NAME, READING_EXEL_DATA_FOLDER_NAME
+        
         def read_W_file_txt(file: str, letter_ID: str, decimals: int = 1) -> pd.DataFrame:
             """
             Legge un file in formato 'dati.txt' (output strumento WED con 6 sorgenti,
@@ -702,7 +814,7 @@ class manager:
                 print(f'Iterazione sulla directory: {dir}') 
                 chdir(self.main_dir + '/' + dir + '/' + dir) #entro nella cartella della misura i-esima
             
-                if dir == "misW":
+                if dir in READING_TXT_DATA_FOLDER_NAME:
                     df = read_W_file_txt('misW.txt','W')
                 else:
                     df, num_of_track, n_files = files.read_measure_file(file_name,list(dir)[-1], format = format)
@@ -721,8 +833,12 @@ class manager:
                 print(f'Iterazione sulla directory: {dir}')    
                 chdir(self.main_dir + '/' + dir) # entro nella cartella dei dati (misE, misF, ecc...)
                 
-                if dir == "misW":
+                if dir in READING_TXT_DATA_FOLDER_NAME:                
                     df = read_W_file_txt('misW.txt','W')
+
+                elif dir in READING_EXEL_DATA_FOLDER_NAME:
+                    df = files.read_measure_file(file_name, letter_ID=list(dir)[-1], format='xlsx') #salvo i DF totale delle misure (A,B,C,G,H)
+
                 else:
                     df = files.read_measure_file(file_name,letter_ID=list(dir)[-1], format='csv') # salvo il DF totale delle misure  (D,E,F,ecc)
                 
