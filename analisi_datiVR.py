@@ -293,7 +293,7 @@ class files:
 
             # Procedo alla creazione del dataframe ============
 
-            csv_files = glob.glob('*.csv') # salvo la lista di tutti i file csv che ci sono
+            # csv_files = glob.glob('*.csv') # salvo la lista di tutti i file csv che ci sono
             csv_files.sort() # riordino per nome la lista dei file
 
             letter_id_number = 1 #inizializzo il numero della misura ad 1 per ogni nuovo file misure ( in modo che d1,d2,d3...f1,f2,f3...)
@@ -899,6 +899,7 @@ class analisi:
             
 
             files_csv = glob.glob(self.main_dir + '/*.csv') #leggo solo i file con estensione csv
+            files_csv.sort()
             # print(files)
 
             df_list = [] # lista dei dataframe che ci sono
