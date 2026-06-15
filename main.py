@@ -13,11 +13,11 @@ risultati_directory = '/output'
 dpi_directory = '/DPI_check'
 
 
+
 def main(main_directory):
     # sys.stdout = open('VR_rumore.out', 'w')
-
     chdir(main_directory + misure_directory) # mi sposto nella cartella delle misure
-
+    
     # ==========================================================================
     # Inizializzazione: lettura file e creazione tabelle =====================================
 

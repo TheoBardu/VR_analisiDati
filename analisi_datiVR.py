@@ -949,7 +949,7 @@ class analisi:
             
             df_avg['Ti'] = [[]] * len(df_avg) #creo la colonna con i valori di exposure time
             df_avg['GrOm'] = [[]] * len(df_avg) #creo la colonna con gli ID del gruppo omogeneo
-            df_avg['DPI'] = [[]] * len(df_avg) #creo la colonna contenente il riferimento all'uso del DPI
+            # df_avg['DPI'] = [[]] * len(df_avg) #creo la colonna contenente il riferimento all'uso del DPI
 
 
             files.write_csv(df_avg, self.main_dir + '/averaged_data.csv')
@@ -1046,24 +1046,30 @@ class analisi:
         print(f'Lookup mansioni caricato ({len(lookup_mansioni)} voci): {lookup_mansioni}')
 
         # ==================================================================
-        # STEP 2 — Parsing foglio 'Gruppi_omogenei'
+        # STEP 2 — Parsing foglio 'Scheda_mansioni' per costruzione schede
         # Costruisce df_grom con colonne: [ID_misura, ID_GrOm, Descrizione, Ti]
         #
         # Struttura del foglio:
         #   Riga 1-2 : titolo/vuote
-        #   Riga 3   : nomi mansioni nelle colonne dispari (A, C, E, ...)
-        #              es. ('Addetto lavaggio', None, 'Adetto sollevamento', None, ...)
-        #   Riga 4   : header 'ID', 'Ti', 'ID', 'Ti', ... (ripetuto per ogni gruppo)
-        #   Righe 5+ : dati (ID_misura, Ti) per ogni gruppo
+        #   Colonna A: ID_GrOr (id gruppo omogeneo)
+        #   Colonna B: Descrizione_GrOm
+        #   Colonna E: Descrizione_compito
+        #   Colonna F: ID_misura (F1,E4,....)
+        #   Colonna G: Ti (tempi del compito)
+        #   Colonna H: WBV (ID misura vib corpo intero, es: wbw1, wbv2,..)
+        #   Colonna I: HAV (ID misura vib mano-braccio, es: hav1, hav2, ..)
         # ==================================================================
-        ws_gruppi = wb[sheet_gruppi]
-        all_rows  = list(ws_gruppi.iter_rows(values_only=True))
+        ws_gruppi = wb[sheet_mansioni] 
+        all_rows  = list(ws_gruppi.iter_rows(min_row=3, values_only=True))
+
+        id_gror_list = list(dict.fromkeys(elemento[0] for elemento in all_rows)) #prendo gli elementi unici degli id grom 
+        n_groups = len(id_gror_list) # vedo quanti grom ci sono
+
+
 
         row_mansioni = all_rows[2]  # riga 3 (0-indexed -> indice 2)
         data_rows    = all_rows[4:] # righe dati da riga 5 in avanti (indice 4+)
 
-        n_cols  = len(row_mansioni)
-        n_groups = n_cols // 2  # ogni gruppo occupa 2 colonne: ID e Ti
 
         df_grom_rows = []
 
