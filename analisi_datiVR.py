@@ -1023,7 +1023,7 @@ class analisi:
             raise FileNotFoundError(
                 f"File excel non trovato: '{excel_info_dir}'\n"
                 f"Controlla che il file {name_exel_info} sia presente in: "
-                f"'{dirname(excel_info_dir)}'"
+                f"'{dirname(excel_info_dir)}' e si chiami {name_exel_info}"
             )
 
         print(f'Lettura file scheda gruppi: {excel_info_dir}')
