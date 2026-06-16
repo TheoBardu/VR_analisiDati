@@ -513,6 +513,10 @@ class files:
         print('Salvataggio del file exel completato')
 
 
+    def write_excel_append(df, file, sheet_name):
+        with pd.ExcelWriter(file, mode='a', engine='openpyxl', if_sheet_exists='replace') as writer:
+            df.to_excel(writer, sheet_name = sheet_name, index=False, header= True)
+
     def get_scheda_DPI(excel_info_dir, name_excel_info, sheet_name='Scheda_DPI'):
         '''
         Funzione che legge il foglio "Scheda_DPI" del file excel informativo e restituisce
@@ -965,56 +969,32 @@ class analisi:
     
     def get_scheda_info(self, df_avg, excel_info_dir=None, name_exel_info="scheda_gruppi_dpi.xlsx"):
         '''
-        Funzione che legge il file excel "scheda_gruppi_dpi.xlsx" e popola le colonne
-        GrOm e Ti del dataframe df_avg con i valori dei gruppi omogenei e dei tempi
-        di esposizione per ciascuna misura.
-
-        La funzione va chiamata DOPO average_values() e PRIMA di VR_8h().
-        Sostituisce il passaggio manuale di inserimento di GrOm e Ti in averaged_data.csv.
-
-        INPUT:
-            df_avg     = <pd.DataFrame>, dataframe con i valori medi delle misure,
-                         output di average_values(). Deve contenere almeno la colonna 'ID'
-                         (es. 'F4', 'D3', 'E1', ...) e le colonne 'GrOm' e 'Ti'.
-            excel_info = <str>, percorso completo del file excel con la scheda dei gruppi
-                         omogenei. Default: main_directory + "/scheda_gruppi_dpi.xlsx"
-                         (una directory sopra self.main_dir, che corrisponde a data_folder).
-
+        Funzione che prende in ingresso df_avg e il file excel con le schede mansioni e ne fa il merge con la corrispondenza
+        dell'ID misura. 
+        Unisce i dataframe in un unico dataframe chiamato df_global e lo salva in /data.
+        
         OUTPUT:
-            df_avg = <pd.DataFrame>, stesso dataframe in input con le colonne aggiornate:
-                     - 'GrOm': lista di stringhe con gli ID_GrOm di tutti i gruppi
-                                omogenei in cui compare la misura (es. ['M_01', 'M_03'])
-                     - 'Ti'  : lista di interi con i tempi di esposizione [min] per
-                                ciascun gruppo omogeneo (es. [90, 120])
-                     Il dataframe aggiornato viene salvato sovrascrivendo
-                     averaged_data.csv e averaged_data.xlsx nella cartella self.main_dir.
-
-        RAISES:
-            ValueError: se una mansione presente nel foglio 'Gruppi_omogenei' non ha
-                        corrispondenza nel foglio 'Scheda_mansioni'.
-            ValueError: se un ID presente in df_avg non compare in nessun gruppo
-                        omogeneo nel foglio 'Gruppi_omogenei'.
-            FileNotFoundError: se il file excel_info non esiste al percorso specificato.
+            df_global = pd.dataFrame, contiene l'unione dell'excel scheda_gruppi_dpi.xlsx e df_avg.
         '''
-        import openpyxl
+        import pandas as pd
         from os.path import dirname, exists
+        from config import SCHEDA_MANSIONI
+
 
         # ------------------------------------------------------------------
         # Variabili interne (modificabili facilmente)
         # ------------------------------------------------------------------
-        sheet_gruppi   = 'Gruppi_omogenei'   # nome foglio gruppi omogenei
-        sheet_mansioni = 'Scheda_mansioni'    # nome foglio scheda mansioni
-
-        # Percorsi di output (sovrascrittura dei file averaged_data)
-        out_csv  = self.main_dir + '/averaged_data.csv'
-        out_xlsx = self.main_dir + '/averaged_data.xlsx'
+        sheet_mansioni = SCHEDA_MANSIONI   # nome foglio scheda mansioni
 
         # Percorso default del file excel: una directory sopra self.main_dir
         # (corrisponde a main_directory, dato che self.main_dir = main_directory/data)
         if excel_info_dir is None:
             excel_info_dir = dirname(self.main_dir) + ''
-        else:
-            excel_info_dir = excel_info_dir + '/' + name_exel_info  # usa il percorso specificato in input
+
+
+        # Percorsi di output (scrittura del df_global in formato excel sovrascrivendo il precedente)
+        out_xlsx = excel_info_dir + '/scheda_gruppi_dpi.xlsx'
+
 
         # ------------------------------------------------------------------
         # Verifica esistenza file excel
@@ -1027,149 +1007,52 @@ class analisi:
             )
 
         print(f'Lettura file scheda gruppi: {excel_info_dir}')
-        wb = openpyxl.load_workbook(excel_info_dir, data_only=True)
+        
+        
 
         # ==================================================================
-        # STEP 1 — Lettura foglio 'Scheda_mansioni'
-        # Costruisce dizionario lookup: {Descrizione_GrOm -> ID_GrOm}
-        # Header in riga 2, dati da riga 3 in avanti.
+        # STEP 1 — Lettura foglio 'Scheda_mansioni' come dataframe
         # ==================================================================
-        ws_mansioni = wb[sheet_mansioni]
+        df_scheda_gruppi_dpi = pd.read_excel(excel_info_dir + "/" + name_exel_info, sheet_name=sheet_mansioni, header=1)
 
-        lookup_mansioni = {}  # { 'Addetto lavaggio': 'M_01', ... }
-        for row in ws_mansioni.iter_rows(min_row=3, values_only=True):
-            id_grom    = row[0]   # colonna A: ID_GrOm   (es. 'M_01')
-            descrizione = row[1]  # colonna B: Descrizione_GrOm (es. 'Addetto lavaggio')
-            if id_grom is not None and descrizione is not None:
-                lookup_mansioni[str(descrizione).strip()] = str(id_grom).strip()
-
-        print(f'Lookup mansioni caricato ({len(lookup_mansioni)} voci): {lookup_mansioni}')
-
-        # ==================================================================
-        # STEP 2 — Parsing foglio 'Scheda_mansioni' per costruzione schede
-        # Costruisce df_grom con colonne: [ID_misura, ID_GrOm, Descrizione, Ti]
-        #
-        # Struttura del foglio:
-        #   Riga 1-2 : titolo/vuote
-        #   Colonna A: ID_GrOr (id gruppo omogeneo)
-        #   Colonna B: Descrizione_GrOm
-        #   Colonna E: Descrizione_compito
-        #   Colonna F: ID_misura (F1,E4,....)
-        #   Colonna G: Ti (tempi del compito)
-        #   Colonna H: WBV (ID misura vib corpo intero, es: wbw1, wbv2,..)
-        #   Colonna I: HAV (ID misura vib mano-braccio, es: hav1, hav2, ..)
-        # ==================================================================
-        ws_gruppi = wb[sheet_mansioni] 
-        all_rows  = list(ws_gruppi.iter_rows(min_row=3, values_only=True))
-
-        id_gror_list = list(dict.fromkeys(elemento[0] for elemento in all_rows)) #prendo gli elementi unici degli id grom 
-        n_groups = len(id_gror_list) # vedo quanti grom ci sono
+        df_scheda_gruppi_dpi = df_scheda_gruppi_dpi.merge(
+            df_avg[['ID', 'U', 'LeqA', 'LeqC', 'Ppeak']],
+            left_on='ID_misura',
+            right_on='ID',
+            how='left'
+        ).drop(columns=['ID'])
 
 
+        df_avg = df_avg.merge(
+            df_scheda_gruppi_dpi[['ID_misura']],
+            left_on = 'ID',
+            right_on = 'ID_misura',
+            how='left',
+            indicator=True
+        )
 
-        row_mansioni = all_rows[2]  # riga 3 (0-indexed -> indice 2)
-        data_rows    = all_rows[4:] # righe dati da riga 5 in avanti (indice 4+)
+        # Prendo eventuali valori che non sono stati usati da df_avg
+        missing_ids = df_avg.loc[df_avg['_merge'] == 'left_only', 'ID'].unique().tolist()
 
+        
 
-        df_grom_rows = []
-
-        for g in range(n_groups):
-            col_id = g * 2        # indice colonna ID
-            col_ti = g * 2 + 1   # indice colonna Ti
-
-            mansione_nome = row_mansioni[col_id]
-            if mansione_nome is None:
-                continue  # colonna vuota: nessun gruppo definito, si passa al prossimo
-
-            mansione_nome = str(mansione_nome).strip()
-
-            # Ricerca ID_GrOm nel dizionario di lookup
-            if mansione_nome not in lookup_mansioni:
-                raise ValueError(
-                    f"Mansione '{mansione_nome}' (foglio '{sheet_gruppi}', gruppo {g+1}) "
-                    f"non trovata nel foglio '{sheet_mansioni}'.\n"
-                    f"Verifica che il nome sia identico nella colonna 'Descrizione_GrOm'.\n"
-                    f"Voci disponibili: {list(lookup_mansioni.keys())}"
-                )
-
-            id_grom = lookup_mansioni[mansione_nome]
-
-            # Lettura righe dati per questo gruppo
-            for data_row in data_rows:
-                id_misura = data_row[col_id]
-                ti_val    = data_row[col_ti]
-
-                if id_misura is None:
-                    continue  # riga vuota per questo gruppo
-
-                df_grom_rows.append({
-                    'ID_misura':   str(id_misura).strip(),
-                    'ID_GrOm':     id_grom,
-                    'Descrizione': mansione_nome,
-                    'Ti':          int(ti_val)
-                })
-
-        df_grom = pd.DataFrame(df_grom_rows, columns=['ID_misura', 'ID_GrOm', 'Descrizione', 'Ti'])
-        print(f'df_grom costruito con {len(df_grom)} righe:')
-        print(df_grom.to_string(index=False))
-
-        # ==================================================================
-        # STEP 3 — Popolamento colonne GrOm e Ti in df_avg
-        #
-        # NOTA: le colonne GrOm e Ti in df_avg sono inizializzate da average_values()
-        # come interi (dtype int64). Prima di assegnare liste occorre forzare
-        # il tipo a object, altrimenti pandas lancia TypeError.
-        # ==================================================================
-        df_avg['GrOm'] = df_avg['GrOm'].astype(object)
-        df_avg['Ti']   = df_avg['Ti'].astype(object)
-        #
-        # Per ogni riga di df_avg (identificata da colonna 'ID'):
-        #   - cerca tutte le occorrenze di quell'ID in df_grom
-        #   - scrive la lista degli ID_GrOm in df_avg['GrOm']
-        #   - scrive la lista dei Ti in df_avg['Ti']
-        # Se un ID non è trovato in nessun gruppo -> Warning
-
-        missing_ids = []
-
-        for idx, row in df_avg.iterrows():
-            id_misura = str(row['ID']).strip()
-
-            # Filtra df_grom per trovare tutti i gruppi che contengono questa misura
-            matches = df_grom[df_grom['ID_misura'] == id_misura]
-
-            if matches.empty:
-                missing_ids.append(id_misura)
-                continue  # lascia GrOm e Ti invariati per questa riga, prosegue
-
-
-            # Scrivi le liste nelle colonne GrOm e Ti
-            df_avg.at[idx, 'GrOm'] = matches['ID_GrOm'].tolist()
-            df_avg.at[idx, 'Ti']   = matches['Ti'].tolist()
-
-        print('\nPopolamento GrOm e Ti completato.')
-        print(df_avg[['ID', 'GrOm', 'Ti']].to_string(index=False))
-
-            # Warning finale non bloccante per le misure non trovate
         if missing_ids:
             print(
-                f'\n*** WARNING: Le seguenti misure di df_avg non sono state trovate '
-                f'in nessun gruppo omogeneo nel file:\n'
-                f'    {excel_info_dir}\n'
+                f'\n*** WARNING: Le seguenti misure di df_avg non sono state usate:\n '
                 f'    Misure mancanti: {missing_ids}\n'
-                f'    Le colonne GrOm e Ti di queste righe sono rimaste invariate.\n'
-                f'    Verifica che gli ID siano presenti nel foglio "{sheet_gruppi}".\n'
-                f'    ID disponibili in df_grom: {sorted(df_grom["ID_misura"].unique().tolist())}\n'
                 f'***'
             )
 
         # ==================================================================
         # STEP 4 — Salvataggio (sovrascrittura averaged_data.csv e .xlsx)
         # ==================================================================
-        files.write_csv(df_avg, out_csv)
-        files.write_exel(df_avg, out_xlsx)
-        print(f'\nFile aggiornati salvati:\n  CSV  -> {out_csv}\n  XLSX -> {out_xlsx}')
+        # files.write_csv(df_avg, out_csv)
 
-        return df_avg
+
+        files.write_excel_append(df_scheda_gruppi_dpi, out_xlsx, sheet_mansioni )
+        print(f'\nFile aggiornati sovrascritti:\n  XLSX -> {out_xlsx}')
+
+        return df_scheda_gruppi_dpi
 
     #DEPRECATED, sostituita da analisi_8h()
     def calcolo_Leq8h(self, df_GrOm, T0 = 480):
@@ -1221,86 +1104,85 @@ class analisi:
         return self.U_ext, self.U_comb_std
 
 
-    def analisi_8h(self, output_dir, df_avg, T0=480, u2m=0.7, u_pos=1.0):
+    def analisi_8h(self, output_dir, df_HEG: pd.DataFrame, T0=480, u2m=0.7, u_pos=1.0):
         '''
         Funzione che calcola la valutazione del rischio rumore su base giornaliera (8h)
-        per ogni gruppo omogeneo presente in df_avg.
+        per ogni gruppo omogeneo presente in df_HEG.
 
         Per ogni gruppo omogeneo vengono calcolati:
-            - Lex8h    : livello sonoro equivalente ponderato A su 8h  [cella I44 / G44 del foglio Excel]
-            - U        : incertezza estesa                              [cella K44 / G46 del foglio Excel]
-            - Lex_max  : Lex8h + U                                     [cella O44 del foglio Excel]
-            - L_picco_C: massimo dei Ppeak nel gruppo omogeneo         [cella O45 del foglio Excel]
+            - Lex8h    : livello sonoro equivalente ponderato A su 8h  
+            - U        : incertezza estesa                             
+            - Lex_max  : Lex8h + U                                     
+            - L_picco_C: massimo dei Ppeak nel gruppo omogeneo         
 
         TEORIA (D.Lgs. 81/08, norma ISO 9612):
 
-            AG_i    = Ti/T0 * 10^(LeqA_i / 10)              [col. AG foglio Excel]
-            Lex8h   = 10 * log10( SUM(AG_i) )                [G44 = I44]
+            AG_i    = Ti/T0 * 10^(LeqA_i / 10)              
+            Lex8h   = 10 * log10( SUM(AG_i) )               
 
-            Z_i     = Ti/T0 * 10^((LeqA_i - Lex8h) / 10)   [col. Z foglio Excel]
-            W_i     = max(0, Z_i^2 * (u_i^2 + u2m^2 + u_pos^2))  [col. W foglio Excel]
+            Z_i     = Ti/T0 * 10^((LeqA_i - Lex8h) / 10)   
+            W_i     = max(0, Z_i^2 * (u_i^2 + u2m^2 + u_pos^2)) 
                       (il II termine X_i, legato alla variabilita` di Tm, e` posto = 0)
-            U_comb  = SUM(W_i)                               [G45]
-            U       = 1.65 * sqrt(U_comb)                    [G46 = K44]
+            U_comb  = SUM(W_i)                               
+            U       = 1.65 * sqrt(U_comb)                    
 
-            Lex_max   = Lex8h + U                            [O44]
-            L_picco_C = max(Ppeak nel gruppo)                [O45]
+            Lex_max   = Lex8h + U                            
+            L_picco_C = max(Ppeak nel gruppo)                
 
         INPUT:
             output_dir = <str>, directory in cui salvare i file di output
-            df_avg     = <pd.DataFrame>, dataframe con le medie delle misure.
-                         Le colonne Ti e GrOm contengono liste (una voce per ogni
-                         gruppo omogeneo di appartenenza della misura).
-                         Esempio riga: ID='F1', Ti=[230,90,180], GrOm=['M1','M2','M3']
+            df_HEG     = <pd.DataFrame>, dataframe con i totali delle misure.
             T0         = <int>, tempo di riferimento in minuti (default 480 = 8h)
             u2m        = <float>, incertezza strumentale U2 (default 0.7 dB)
             u_pos      = <float>, incertezza di posizione U3 (default 1.0 dB)
 
         OUTPUT (file scritti in output_dir):
-            VR8h.csv  e  VR8h.xlsx  : file unico riepilogativo con i risultati di tutti
+            VR8h_totale.csv  e  VR8h_totale.xlsx  : file unico riepilogativo con i risultati di tutti
                                        i gruppi omogenei (GrOm, Lex8h, U, Lex_max, L_picco_C)
-            VR8h_<GrOm>.csv  e  VR8h_<GrOm>.xlsx  : un file per ogni gruppo omogeneo con
+            VR8h_<ID_GrOm>_<descrizione_grom>.csv  e  VR8h_<GrOm>_<descrizione_grom>.xlsx  : un file per ogni gruppo omogeneo con
                                        il dettaglio delle misure (ID, LeqA, LeqC, U, Ti)
         '''
-        import ast
         import os
+        import pandas as pd
+        from config import (NOME_VR8h_totale, 
+                            NOME_VR8h_riepilogo,
+                            Nome_colonna_IDgrom,
+                            Nome_colonna_Descrizione_GrOm)
 
         # ----------------------------------------------------------------
-        # STEP 1 — Parsing di Ti e GrOm: lista Python o stringa da CSV
-        #          Esplosione del dataframe: una riga per ogni (ID, GrOm, Ti)
+        # STEP 1 — Lettura unici valori gruppi omogenei
         # ----------------------------------------------------------------
-        rows = []
-        for _, row in df_avg.iterrows():
-            ti_list   = row['Ti']   if isinstance(row['Ti'],   list) else ast.literal_eval(row['Ti'])
-            grom_list = row['GrOm'] if isinstance(row['GrOm'], list) else ast.literal_eval(row['GrOm'])
-            for ti, grom in zip(ti_list, grom_list):
-                rows.append({**row.to_dict(), 'Ti': ti, 'GrOm': grom})
-        df_exp = pd.DataFrame(rows)
+        
+        grom_id_unique = df_HEG[Nome_colonna_IDgrom].unique()
 
         # ----------------------------------------------------------------
         # STEP 2 — Ciclo su ogni gruppo omogeneo: calcoli e raccolta risultati
         # ----------------------------------------------------------------
-        summary_rows = []  # raccoglie una riga di riepilogo per ogni gruppo
+        summary_rows = []  # raccoglie una riga di riepilogo per ogni gruppo omogeneo del dataframe
 
-        for grp_name, grp in df_exp.groupby('GrOm'):
+        for grom in grom_id_unique:
+            
+            #Seleziono la restrizione al gruppo omogeneo del dataframe
+            df_tmp = df_HEG[df_HEG[Nome_colonna_IDgrom] == grom] 
+            mansione = df_tmp[df_tmp[Nome_colonna_IDgrom] == grom][Nome_colonna_Descrizione_GrOm].tolist()[0]
 
             # STEP 3 — Verifica che la somma dei Ti sia esattamente T0
-            tot_ti = grp['Ti'].sum()
+            tot_ti = df_tmp['Ti'].sum()
             if tot_ti != T0:
                 raise ValueError(
-                    f"Gruppo omogeneo '{grp_name}': somma dei Ti = {tot_ti} min "
+                    f"Gruppo omogeneo {grom}| {mansione} : somma dei Ti = {tot_ti} min "
                     f"!= T0 = {T0} min. Controlla i valori di Ti nel file averaged_data."
                 )
 
-            leqa  = grp['LeqA'].values
-            ti    = grp['Ti'].values
-            u_mis = grp['U'].values
+            leqa  = df_tmp['LeqA'].values
+            ti    = df_tmp['Ti'].values
+            u_mis = df_tmp['U'].values
 
-            # STEP 4 — Lex8h  (cella G44 = I44 del foglio Excel)
+            # STEP 4 — Lex8h 
             #          AG_i = Ti/T0 * 10^(LeqA_i / 10)
             lex8h = 10 * log10(sum(ti / T0 * 10**(leqa / 10)))
 
-            # STEP 5 — Incertezza estesa U  (cella G46 = K44 del foglio Excel)
+            # STEP 5 — Incertezza estesa U  
             #          Z_i = Ti/T0 * 10^((LeqA_i - Lex8h) / 10)   [col. Z]
             #          W_i = max(0, Z_i^2 * (u_i^2 + u2m^2 + u_pos^2))  [col. W]
             #          II termine X_i = 0  (Tmax/Tmin non disponibili in df_avg)
@@ -1308,34 +1190,49 @@ class analisi:
             w     = max(z**2 * (u_mis**2 + u2m**2 + u_pos**2), 0)
             U_val = 1.65 * sqrt(sum(w))
 
-            # STEP 6 — Lex_max (O44) e L_picco_C (O45)
+            # STEP 6 — Lex_max e L_picco_C
             lex_max   = lex8h + U_val
-            l_picco_c = max(grp['Ppeak'].values)
+            l_picco_c = max(df_tmp['Ppeak'].values)
+
+            #Calcolo classe di rischio
+            if lex_max < 80:
+                classe_rischio = 'BASSA'
+            elif 80 <= lex_max < 85:
+                classe_rischio = 'MEDIA'
+            elif lex_max >= 85:
+                classe_rischio = 'ALTA'
+            else:
+                classe_rischio = ""
+
 
             # STEP 7 — Accumulo riga di riepilogo
             summary_rows.append({
-                'GrOm':      grp_name,
+                'ID_GrOm':   grom,
+                'Mansione': mansione,
                 'Lex8h':     round(lex8h,     1),
                 'U':         round(U_val,     1),
                 'Lex_max':   round(lex_max,   1),
                 'L_picco_C': round(l_picco_c, 1),
+                'classe_rischio': classe_rischio
             })
 
             # STEP 8 — File di dettaglio per il gruppo: ID, LeqA, LeqC, U, Ti
-            df_detail = grp[['ID', 'LeqA', 'LeqC', 'U', 'Ti']].reset_index(drop=True)
-            detail_csv  = os.path.join(output_dir, f'VR8h_{grp_name}.csv')
-            detail_xlsx = os.path.join(output_dir, f'VR8h_{grp_name}.xlsx')
+            total_xlsx_dir = os.path.join(output_dir, NOME_VR8h_totale)
 
             # Check sull'esistenza della directory
             if not os.path.exists(output_dir):
                 os.makedirs(output_dir)
                 print(f'-- {output_dir} created --')
 
-            df_detail.to_csv(detail_csv,   index=True)
-            df_detail.to_excel(detail_xlsx, index=True)
+            if not os.path.exists(total_xlsx_dir):
+                with pd.ExcelWriter(total_xlsx_dir, mode='w', engine='openpyxl') as writer:
+                    df_tmp.to_excel(writer, sheet_name=f"Scheda {grom}", index=False)
+            else:
+                with pd.ExcelWriter(total_xlsx_dir, mode='a', engine='openpyxl', if_sheet_exists='replace') as writer:
+                    df_tmp.to_excel(writer, sheet_name=f"Scheda {grom}", index=False)
 
             print('\n\n')
-            print(f'Gruppo {grp_name}: \nLex8h={round(lex8h,1)} dB(A)\n'
+            print(f'Gruppo {grom} | {mansione}: \nLex8h={round(lex8h,1)} dB(A)\n'
                   f'U={round(U_val,1)} dB \nLex_max={round(lex_max,1)} dB(A)\n'
                   f'L_picco_C={round(l_picco_c,1)} dB(C)')
 
@@ -1344,8 +1241,7 @@ class analisi:
         # STEP 9 — File riepilogativo unico VR8h.csv e VR8h.xlsx
         # ----------------------------------------------------------------
         df_summary = pd.DataFrame(summary_rows)
-        df_summary.to_csv( os.path.join(output_dir, 'VR8h_totale.csv'),  index=True)
-        df_summary.to_excel(os.path.join(output_dir, 'VR8h_totale.xlsx'), index=True)
+        df_summary.to_excel(os.path.join(output_dir, NOME_VR8h_riepilogo), index=False)
 
         print(f'\n###\nanalisi_8h completata.\nDati salvati in {output_dir}\n###')
 
