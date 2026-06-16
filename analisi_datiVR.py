@@ -993,7 +993,8 @@ class analisi:
 
 
         # Percorsi di output (scrittura del df_global in formato excel sovrascrivendo il precedente)
-        out_xlsx = excel_info_dir + '/scheda_gruppi_dpi.xlsx'
+        base_name, ext = name_exel_info.rsplit('.', 1)
+        out_xlsx = f"{excel_info_dir}/{base_name}_mod.{ext}"
 
 
         # ------------------------------------------------------------------
