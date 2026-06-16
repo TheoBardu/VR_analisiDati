@@ -7,7 +7,7 @@ import sys
 from analisi_datiVR import manager, analisi
 
 # La main directory deve essere la root (quindi la cartella dell'azienda)
-main_directory = '/Users/theo/Desktop/P.IVA/Aziende/Ermes/Lavori/SITITALIA spa.p/rev/rev/Rumore'
+main_directory = '/Users/theo/Desktop/P.IVA/Aziende/Ermes/Lavori/SITITALIA spa.p/rev/rev8/Rumore'
 misure_directory = '/misure'
 risultati_directory = '/output'
 dpi_directory = '/DPI_check'
@@ -54,7 +54,7 @@ def main(main_directory):
     # ==========================================================================
     a.analisi_8h(main_directory + risultati_directory, df_HEG)
     
-    input('Femi qui per ora')
+    input('Femi qui per ora, DPI da correggere.')
 
     # Applicazione medoto HLM per i DPI sulle misure singole
     a.applica_DPI_HML(excel_info_dir=main_directory , 

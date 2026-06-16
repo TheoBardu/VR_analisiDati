@@ -513,8 +513,8 @@ class files:
         print('Salvataggio del file exel completato')
 
 
-    def write_excel_append(df, file, sheet_name):
-        with pd.ExcelWriter(file, mode='a', engine='openpyxl', if_sheet_exists='replace') as writer:
+    def write_excel_append(df, file, sheet_name, mode_writer = 'w'):
+        with pd.ExcelWriter(file, mode = mode_writer, engine='openpyxl') as writer:
             df.to_excel(writer, sheet_name = sheet_name, index=False, header= True)
 
     def get_scheda_DPI(excel_info_dir, name_excel_info, sheet_name='Scheda_DPI'):
@@ -995,7 +995,6 @@ class analisi:
         # Percorsi di output (scrittura del df_global in formato excel sovrascrivendo il precedente)
         base_name, ext = name_exel_info.rsplit('.', 1)
         out_xlsx = f"{excel_info_dir}/{base_name}_mod.{ext}"
-
 
         # ------------------------------------------------------------------
         # Verifica esistenza file excel
