@@ -1241,7 +1241,7 @@ class analisi:
         # STEP 9 — File riepilogativo unico VR8h.csv e VR8h.xlsx
         # ----------------------------------------------------------------
         df_summary = pd.DataFrame(summary_rows)
-        df_summary.to_excel(os.path.join(output_dir, NOME_VR8h_riepilogo), index=False)
+        df_summary.to_excel(os.path.join(output_dir, NOME_VR8h_riepilogo), index=False, sheet_name='Riepilogo')
 
         print(f'\n###\nanalisi_8h completata.\nDati salvati in {output_dir}\n###')
 
