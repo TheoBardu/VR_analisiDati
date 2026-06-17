@@ -15,6 +15,78 @@ class exel_file:
     '''
     Classe che serve per la manipolazione dei file excel
     '''
+
+    def formatting_excel_VR8h_totale(file_path: str, output_path: str = None) -> str:
+        """
+        Formatta un file Excel applicando le seguenti modifiche su tutti i fogli:
+        - Larghezza colonne adattata al contenuto
+        - Colonna K (dalla riga 2) colorata in arancione chiaro (#FFA07A)
+        - Colonna M (dalla riga 2) colorata in rosso scuro (#FF4500)
+        - Colonna J (dalla riga 2) colorata in azzurro (#87CEEB)
+
+        Args:
+            file_path:   Percorso del file Excel di input.
+            output_path: Percorso di output (opzionale).
+                        Se None, sovrascrive il file originale.
+
+        Returns:
+            Percorso del file salvato.
+        """
+        import shutil
+        import openpyxl
+        from openpyxl.utils import get_column_letter
+
+        
+        if not path.isfile(file_path):
+            raise FileNotFoundError(f"File non trovato: {file_path}")
+
+        # Percorso di output
+        if output_path is None:
+            output_path = file_path
+        elif output_path != file_path:
+            shutil.copy2(file_path, output_path)
+
+        wb = openpyxl.load_workbook(output_path)
+
+        # Colori di riempimento
+        fill_K = PatternFill(fill_type="solid", fgColor="FFA07A")  # arancione
+        fill_M = PatternFill(fill_type="solid", fgColor="FF4500")  # rosso scuro
+        fill_J = PatternFill(fill_type="solid", fgColor="87CEEB")  # azzurro
+
+        for sheet_name in wb.sheetnames:
+            ws = wb[sheet_name]
+
+            # ── 1. DIMENSIONAMENTO AUTOMATICO COLONNE ─────────────────────────
+            # Per ogni colonna calcola la lunghezza massima del contenuto
+            col_widths: dict[int, float] = {}
+            for row in ws.iter_rows():
+                for cell in row:
+                    if cell.value is not None:
+                        # Lunghezza del valore come stringa
+                        content_len = len(str(cell.value))
+                        col_idx = cell.column          # intero 1-based
+                        col_widths[col_idx] = max(col_widths.get(col_idx, 0), content_len)
+
+            for col_idx, width in col_widths.items():
+                col_letter = get_column_letter(col_idx)
+                # Aggiungi un piccolo margine e imposta un minimo di 8
+                ws.column_dimensions[col_letter].width = max(width + 2, 8)
+
+            # ── 2. COLORI COLONNE (dalla riga 2 in poi) ───────────────────────
+            color_map = {
+                10: fill_J,   # colonna J
+                11: fill_K,   # colonna K
+                13: fill_M,   # colonna M
+            }
+
+            for col_idx, fill in color_map.items():
+                col_letter = get_column_letter(col_idx)
+                for row_idx in range(2, ws.max_row + 1):
+                    ws[f"{col_letter}{row_idx}"].fill = fill
+
+        wb.save(output_path)
+        print(f"File salvato in: {output_path}")
+        return output_path
     
     def color_column(file_path, column_letters, colors):
         '''
