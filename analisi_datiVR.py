@@ -180,6 +180,42 @@ class exel_file:
         
         wb.save(file_path)
 
+    def colora_classe_rischio(path: str) -> None:
+        from openpyxl import load_workbook
+        COLORI = {
+            "BASSA": "32CD32",
+            "MEDIA": "00BFFF",
+            "ALTA":  "B22222",
+        }
+
+        wb = load_workbook(path)
+    
+        for ws in wb.worksheets:
+            col_idx = None
+    
+            # Cerca la colonna con intestazione "classe_rischio" nella riga 1
+            for cell in ws[1]:
+                if cell.value and str(cell.value).strip().lower() == "classe_rischio":
+                    col_idx = cell.column
+                    break
+    
+            if col_idx is None:
+                print(f"Foglio '{ws.title}': colonna 'classe_rischio' non trovata, skip.")
+                continue
+    
+            # Colora le celle dalla riga 2 in poi
+            for row in ws.iter_rows(min_row=2, min_col=col_idx, max_col=col_idx):
+                cell = row[0]
+                valore = str(cell.value).strip().upper() if cell.value is not None else ""
+                if valore in COLORI:
+                    cell.fill = PatternFill(
+                        fill_type="solid",
+                        start_color=COLORI[valore],
+                        end_color=COLORI[valore],
+                    )
+    
+        wb.save(path)
+        print(f"File salvato: {path}")
 
 
 class files:
