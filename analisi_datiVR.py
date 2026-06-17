@@ -217,6 +217,309 @@ class exel_file:
         wb.save(path)
         print(f"File salvato: {path}")
 
+    def inserisci_valutazione_schede( path_riepilogo: str, path_totale: str, path_output: str,):
+        """
+        inserisci_valutazione_rumore.py
+
+        Funzione che legge i dati dal file VR8h_riepilogo.xlsx e li inserisce
+        nelle schede del file VR8h_totale.xlsx, aggiungendo la tabellina di
+        valutazione a destra (colonne M:T, righe 2-6) di ogni foglio "Scheda N".
+
+        Layout della tabellina inserita:
+        Riga 2 (M2:T2 merged): "VALUTAZIONE SU BASE GIORNALIERA"  (header)
+        Riga 3: LEX,8h | N3=Lex8h | ± | P3=U | → |   | LEX MAX = | T3=Lex_max
+        Riga 4:                                             Massimo dei Lpicco,C = | T4=L_picco_C
+        Righe 5-6 (M5:T6 merged): "CLASSE RISCHIO <classe_rischio>"  (colorato)
+        """
+
+        import copy
+        import openpyxl
+        from openpyxl.styles import (
+            Font, PatternFill, Alignment, Border, Side
+        )
+        from openpyxl.styles.colors import Color
+        from openpyxl.utils import get_column_letter
+
+
+        # ---------------------------------------------------------------------------
+        # Palette colori classe_rischio (rgb in formato AARRGGBB / RRGGBB)
+        # ---------------------------------------------------------------------------
+        CLASSE_FILL = {
+            "BASSA":  {"bg": "FF32CD32", "font_color": "FF000000"},  # verde lime
+            "MEDIA":  {"bg": "FF00BFFF", "font_color": "FF000000"},  # azzurro
+            "ALTA":   {"bg": "FFB22222", "font_color": "FFFFFFFF"},  # rosso scuro
+        }
+
+        # ---------------------------------------------------------------------------
+        # Stili riutilizzabili (costruiti una sola volta)
+        # ---------------------------------------------------------------------------
+        BORDER_MEDIUM = Side(border_style="medium", color="FF000000")
+        BORDER_NONE   = Side(border_style=None)
+
+        def _border(**kwargs):
+            sides = {k: kwargs.get(k, BORDER_NONE) for k in ("left","right","top","bottom")}
+            return Border(**sides)
+
+        def _font(bold=False, size=11, color=None, name="Calibri"):
+            kw = dict(bold=bold, size=size, name=name)
+            if color:
+                kw["color"] = color
+            return Font(**kw)
+
+        def _fill(rgb):
+            return PatternFill("solid", fgColor=Color(rgb=rgb))
+
+        def _align(h="general", v="bottom", wrap=False):
+            return Alignment(horizontal=h, vertical=v, wrap_text=wrap)
+
+
+        # ---------------------------------------------------------------------------
+        # Helpers
+        # ---------------------------------------------------------------------------
+        def _set(ws, row, col, value=None, *, font=None, fill=None, alignment=None, border=None):
+            cell = ws.cell(row, col)
+            if value is not None:
+                cell.value = value
+            if font      is not None: cell.font      = font
+            if fill      is not None: cell.fill      = fill
+            if alignment is not None: cell.alignment = alignment
+            if border    is not None: cell.border    = border
+            return cell
+
+
+        def _safe_merge(ws, min_row, min_col, max_row, max_col):
+            """Esegue merge solo se non già presente."""
+            key = f"{get_column_letter(min_col)}{min_row}:{get_column_letter(max_col)}{max_row}"
+            existing = {str(r) for r in ws.merged_cells.ranges}
+            if key not in existing:
+                ws.merge_cells(start_row=min_row, start_column=min_col,
+                            end_row=max_row,   end_column=max_col)
+
+
+        # ---------------------------------------------------------------------------
+        # Funzione principale
+        # ---------------------------------------------------------------------------
+        def inserisci_valutazione(
+            path_riepilogo: str,
+            path_totale: str,
+            path_output: str,
+        ):
+            """
+            Legge i dati da `path_riepilogo` e li inserisce nelle schede di
+            `path_totale`, salvando il risultato in `path_output`.
+
+            Parametri
+            ----------
+            path_riepilogo : str
+                Percorso di VR8h_riepilogo.xlsx
+            path_totale : str
+                Percorso di VR8h_totale.xlsx (file sorgente, non viene modificato)
+            path_output : str
+                Percorso del file Excel di output
+            """
+
+            # ------------------------------------------------------------------
+            # 1. Leggi il riepilogo
+            # ------------------------------------------------------------------
+            wb_riepilogo = openpyxl.load_workbook(path_riepilogo, data_only=True)
+            sh_riepilogo = wb_riepilogo.active
+
+            # Costruiamo un dict: ID_GrOm -> {Lex8h, U, Lex_max, L_picco_C, classe_rischio}
+            headers = [cell.value for cell in sh_riepilogo[1]]
+            col_idx = {h: i for i, h in enumerate(headers)}
+
+            riepilogo = {}
+            for row in sh_riepilogo.iter_rows(min_row=2, values_only=True):
+                id_grom = str(row[col_idx["ID_GrOm"]])
+                riepilogo[id_grom] = {
+                    "Lex8h":         row[col_idx["Lex8h"]],
+                    "U":             row[col_idx["U"]],
+                    "Lex_max":       row[col_idx["Lex_max"]],
+                    "L_picco_C":     row[col_idx["L_picco_C"]],
+                    "classe_rischio": row[col_idx["classe_rischio"]],
+                }
+
+            # ------------------------------------------------------------------
+            # 2. Apri VR8h_totale e lavora su ogni scheda
+            # ------------------------------------------------------------------
+            wb = openpyxl.load_workbook(path_totale)
+
+            for shname in wb.sheetnames:
+                if not shname.startswith("Scheda"):
+                    continue
+
+                ws = wb[shname]
+
+                # Recupera l'ID dal primo dato (riga 2, colonna A)
+                id_grom = str(ws.cell(2, 1).value)
+                if id_grom not in riepilogo:
+                    print(f"  [AVVISO] '{shname}': ID '{id_grom}' non trovato nel riepilogo. Skip.")
+                    continue
+
+                dati = riepilogo[id_grom]
+                lex8h        = dati["Lex8h"]
+                u            = dati["U"]
+                lex_max      = dati["Lex_max"]
+                l_picco_c    = dati["L_picco_C"]
+                classe       = (dati["classe_rischio"] or "").strip().upper()
+
+                # Palette colore per la classe
+                palette = CLASSE_FILL.get(classe, {"bg": "FFD3D3D3", "font_color": "FF000000"})
+                fill_classe = _fill(palette["bg"])
+                font_classe_color = palette["font_color"]
+
+                # Colonne: M=13, N=14, O=15, P=16, Q=17, R=18, S=19, T=20
+                M, N, O, P, Q, R, S, T = 13, 14, 15, 16, 17, 18, 19, 20
+
+                # ------------------------------------------------------------------
+                # Riga 2: header "VALUTAZIONE SU BASE GIORNALIERA" (M2:T2 merged)
+                # ------------------------------------------------------------------
+                # Prima rimuoviamo eventuali merge già presenti nell'area M:T righe 2-6
+                for mr in list(ws.merged_cells.ranges):
+                    mc = mr.min_col
+                    mr_min_row = mr.min_row
+                    if mc >= M and mc <= T and mr_min_row >= 2 and mr_min_row <= 6:
+                        ws.merged_cells.remove(mr)
+
+                _safe_merge(ws, 2, M, 2, T)
+                _set(ws, 2, M,
+                    value="VALUTAZIONE SU BASE GIORNALIERA",
+                    font=_font(bold=True, size=14),
+                    fill=_fill("FFCCFFCC"),          # indexed 42 -> light green
+                    alignment=_align("center"),
+                    border=_border(left=BORDER_MEDIUM, right=BORDER_MEDIUM,
+                                    top=BORDER_MEDIUM, bottom=BORDER_MEDIUM))
+                # Celle N2:T2 (parte del merge) — solo bordi top/bottom per il contorno esterno
+                for c in range(N, T + 1):
+                    _set(ws, 2, c,
+                        border=_border(top=BORDER_MEDIUM, bottom=BORDER_MEDIUM,
+                                        right=BORDER_MEDIUM if c == T else BORDER_NONE))
+
+                # ------------------------------------------------------------------
+                # Riga 3: LEX,8h | Lex8h | ± | U | → |   | LEX MAX = | Lex_max
+                # ------------------------------------------------------------------
+                fill_bianco = _fill("FFFFFFFF")   # sfondo bianco (indexed 9)
+
+                _set(ws, 3, M,
+                    value="LEX,8h",
+                    font=_font(bold=True, size=14),
+                    fill=fill_bianco,
+                    alignment=_align("center"),
+                    border=_border(left=BORDER_MEDIUM))
+
+                _set(ws, 3, N,
+                    value=lex8h,
+                    font=_font(bold=True, size=14),
+                    fill=fill_bianco,
+                    alignment=_align("right"))
+
+                _set(ws, 3, O,
+                    value="±",
+                    font=_font(bold=True, size=14),
+                    fill=fill_bianco,
+                    alignment=_align("center"))
+
+                _set(ws, 3, P,
+                    value=u,
+                    font=_font(bold=True, size=14),
+                    fill=fill_bianco,
+                    alignment=_align("left"))
+
+                _set(ws, 3, Q,
+                    value="→",
+                    font=_font(bold=False, size=22),
+                    fill=fill_bianco,
+                    alignment=_align("right"))
+
+                _set(ws, 3, R,
+                    value=None,
+                    font=_font(size=22),
+                    fill=fill_bianco,
+                    alignment=_align("left"))
+
+                _set(ws, 3, S,
+                    value="LEX MAX =",
+                    font=_font(bold=True, size=14),
+                    fill=fill_bianco,
+                    alignment=_align("right"))
+
+                _set(ws, 3, T,
+                    value=lex_max,
+                    font=_font(bold=True, size=14),
+                    fill=fill_bianco,
+                    alignment=_align("center"),
+                    border=_border(right=BORDER_MEDIUM))
+
+                # ------------------------------------------------------------------
+                # Riga 4: (vuota a sinistra) | Massimo dei Lpicco,C misurati = | L_picco_C
+                # ------------------------------------------------------------------
+                for c in range(M, S):
+                    _set(ws, 4, c,
+                        value=None,
+                        fill=fill_bianco,
+                        font=_font(size=14),
+                        border=_border(left=BORDER_MEDIUM if c == M else BORDER_NONE))
+
+                _set(ws, 4, S,
+                    value="Massimo dei Lpicco,C misurati =",
+                    font=_font(bold=True, size=14),
+                    fill=fill_bianco,
+                    alignment=_align("right"))
+
+                _set(ws, 4, T,
+                    value=l_picco_c,
+                    font=_font(bold=True, size=14),
+                    fill=fill_bianco,
+                    alignment=_align("center"),
+                    border=_border(right=BORDER_MEDIUM))
+
+                # ------------------------------------------------------------------
+                # Righe 5-6: CLASSE RISCHIO (M5:T6 merged, colorato)
+                # ------------------------------------------------------------------
+                _safe_merge(ws, 5, M, 6, T)
+                _set(ws, 5, M,
+                    value=f"CLASSE RISCHIO {classe}",
+                    font=_font(bold=True, size=14, color=font_classe_color),
+                    fill=fill_classe,
+                    alignment=_align("center", "center"),
+                    border=_border(left=BORDER_MEDIUM, right=BORDER_MEDIUM,
+                                    top=BORDER_MEDIUM, bottom=BORDER_MEDIUM))
+
+                # Celle della seconda riga del merge (row 6) — bordi del contorno
+                for c in range(N, T + 1):
+                    _set(ws, 6, c,
+                        border=_border(bottom=BORDER_MEDIUM,
+                                        right=BORDER_MEDIUM if c == T else BORDER_NONE))
+
+                # ------------------------------------------------------------------
+                # Larghezze colonne M:T (se non già impostate)
+                # ------------------------------------------------------------------
+                col_widths = {M: 6, N: 7, O: 4, P: 6, Q: 4, R: 4, S: 28, T: 10}
+                for col_num, width in col_widths.items():
+                    col_letter = get_column_letter(col_num)
+                    cd = ws.column_dimensions[col_letter]
+                    if cd.width is None or cd.width < 1:
+                        cd.width = width
+
+                # Altezze righe (solo se non impostate)
+                row_heights = {2: 19, 3: 28, 4: 19, 5: 16, 6: 16}
+                for r, h in row_heights.items():
+                    rd = ws.row_dimensions[r]
+                    if rd.height is None or rd.height < 1:
+                        rd.height = h
+
+                print(f"  [OK] '{shname}': classe={classe}, Lex8h={lex8h}, U={u}, "
+                    f"Lex_max={lex_max}, L_picco_C={l_picco_c}")
+
+            # ------------------------------------------------------------------
+            # 3. Salva
+            # ------------------------------------------------------------------
+            wb.save(path_output)
+            print(f"\nFile salvato in: {path_output}")
+        
+        inserisci_valutazione(path_riepilogo, path_totale, path_output)
+
+
 
 class files:
     '''
