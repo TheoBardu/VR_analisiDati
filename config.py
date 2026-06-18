@@ -8,6 +8,7 @@ SHEET_NAME_XLSX = 'Profilo storico'
 # Variabili per la lettura del file modello_scheda_gruppi_dpi
 NOME_VR8h_totale = 'VR8h_totale.xlsx'
 NOME_VR8h_riepilogo = 'VR8h_riepilogo.xlsx'
+NOME_VR8h_aggiornato = 'VR8h_totale_aggiornato.xlsx'
 
 # Nomi schede file scheda_gruppi_dpi.xlsx
 SCHEDA_MANSIONI = 'Scheda_mansioni' 

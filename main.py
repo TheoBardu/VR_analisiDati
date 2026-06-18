@@ -33,6 +33,7 @@ def main(main_directory):
     df_avg = a.average_values() #creazione delle medie delle misure
     # # print(df_avg)
     
+
     # Copio le info dei GrOm e Ti dal file excel
     df_HEG = a.get_scheda_info(df_avg, excel_info_dir=main_directory)     
 

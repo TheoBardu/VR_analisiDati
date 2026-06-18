@@ -369,7 +369,7 @@ class exel_file:
                 font_classe_color = palette["font_color"]
 
                 # Colonne: M=13, N=14, O=15, P=16, Q=17, R=18, S=19, T=20
-                M, N, O, P, Q, R, S, T = 13, 14, 15, 16, 17, 18, 19, 20
+                P, Q, R, S, T, U, V, W = 16, 17, 18, 19, 20, 21, 22, 23
 
                 # ------------------------------------------------------------------
                 # Riga 2: header "VALUTAZIONE SU BASE GIORNALIERA" (M2:T2 merged)
@@ -378,11 +378,11 @@ class exel_file:
                 for mr in list(ws.merged_cells.ranges):
                     mc = mr.min_col
                     mr_min_row = mr.min_row
-                    if mc >= M and mc <= T and mr_min_row >= 2 and mr_min_row <= 6:
+                    if mc >= P and mc <= W and mr_min_row >= 2 and mr_min_row <= 6:
                         ws.merged_cells.remove(mr)
 
-                _safe_merge(ws, 2, M, 2, T)
-                _set(ws, 2, M,
+                _safe_merge(ws, 2, P, 2, W)
+                _set(ws, 2, P,
                     value="VALUTAZIONE SU BASE GIORNALIERA",
                     font=_font(bold=True, size=14),
                     fill=_fill("FFCCFFCC"),          # indexed 42 -> light green
@@ -390,60 +390,60 @@ class exel_file:
                     border=_border(left=BORDER_MEDIUM, right=BORDER_MEDIUM,
                                     top=BORDER_MEDIUM, bottom=BORDER_MEDIUM))
                 # Celle N2:T2 (parte del merge) — solo bordi top/bottom per il contorno esterno
-                for c in range(N, T + 1):
+                for c in range(Q, W + 1):
                     _set(ws, 2, c,
                         border=_border(top=BORDER_MEDIUM, bottom=BORDER_MEDIUM,
-                                        right=BORDER_MEDIUM if c == T else BORDER_NONE))
+                                        right=BORDER_MEDIUM if c == W else BORDER_NONE))
 
                 # ------------------------------------------------------------------
                 # Riga 3: LEX,8h | Lex8h | ± | U | → |   | LEX MAX = | Lex_max
                 # ------------------------------------------------------------------
                 fill_bianco = _fill("FFFFFFFF")   # sfondo bianco (indexed 9)
 
-                _set(ws, 3, M,
+                _set(ws, 3, P,
                     value="LEX,8h",
                     font=_font(bold=True, size=14),
                     fill=fill_bianco,
                     alignment=_align("center"),
                     border=_border(left=BORDER_MEDIUM))
 
-                _set(ws, 3, N,
+                _set(ws, 3, Q,
                     value=lex8h,
                     font=_font(bold=True, size=14),
                     fill=fill_bianco,
                     alignment=_align("right"))
 
-                _set(ws, 3, O,
+                _set(ws, 3, R,
                     value="±",
                     font=_font(bold=True, size=14),
                     fill=fill_bianco,
                     alignment=_align("center"))
 
-                _set(ws, 3, P,
+                _set(ws, 3, S,
                     value=u,
                     font=_font(bold=True, size=14),
                     fill=fill_bianco,
                     alignment=_align("left"))
 
-                _set(ws, 3, Q,
+                _set(ws, 3, T,
                     value="→",
                     font=_font(bold=False, size=22),
                     fill=fill_bianco,
                     alignment=_align("right"))
 
-                _set(ws, 3, R,
+                _set(ws, 3, U,
                     value=None,
                     font=_font(size=22),
                     fill=fill_bianco,
                     alignment=_align("left"))
 
-                _set(ws, 3, S,
+                _set(ws, 3, V,
                     value="LEX MAX =",
                     font=_font(bold=True, size=14),
                     fill=fill_bianco,
                     alignment=_align("right"))
 
-                _set(ws, 3, T,
+                _set(ws, 3, W,
                     value=lex_max,
                     font=_font(bold=True, size=14),
                     fill=fill_bianco,
@@ -453,20 +453,20 @@ class exel_file:
                 # ------------------------------------------------------------------
                 # Riga 4: (vuota a sinistra) | Massimo dei Lpicco,C misurati = | L_picco_C
                 # ------------------------------------------------------------------
-                for c in range(M, S):
+                for c in range(P, V):
                     _set(ws, 4, c,
                         value=None,
                         fill=fill_bianco,
                         font=_font(size=14),
-                        border=_border(left=BORDER_MEDIUM if c == M else BORDER_NONE))
+                        border=_border(left=BORDER_MEDIUM if c == P else BORDER_NONE))
 
-                _set(ws, 4, S,
+                _set(ws, 4, V,
                     value="Massimo dei Lpicco,C misurati =",
                     font=_font(bold=True, size=14),
                     fill=fill_bianco,
                     alignment=_align("right"))
 
-                _set(ws, 4, T,
+                _set(ws, 4, W,
                     value=l_picco_c,
                     font=_font(bold=True, size=14),
                     fill=fill_bianco,
@@ -476,8 +476,8 @@ class exel_file:
                 # ------------------------------------------------------------------
                 # Righe 5-6: CLASSE RISCHIO (M5:T6 merged, colorato)
                 # ------------------------------------------------------------------
-                _safe_merge(ws, 5, M, 6, T)
-                _set(ws, 5, M,
+                _safe_merge(ws, 5, P, 6, W)
+                _set(ws, 5, P,
                     value=f"CLASSE RISCHIO {classe}",
                     font=_font(bold=True, size=14, color=font_classe_color),
                     fill=fill_classe,
@@ -486,15 +486,15 @@ class exel_file:
                                     top=BORDER_MEDIUM, bottom=BORDER_MEDIUM))
 
                 # Celle della seconda riga del merge (row 6) — bordi del contorno
-                for c in range(N, T + 1):
+                for c in range(Q, W + 1):
                     _set(ws, 6, c,
                         border=_border(bottom=BORDER_MEDIUM,
-                                        right=BORDER_MEDIUM if c == T else BORDER_NONE))
+                                        right=BORDER_MEDIUM if c == W else BORDER_NONE))
 
                 # ------------------------------------------------------------------
                 # Larghezze colonne M:T (se non già impostate)
                 # ------------------------------------------------------------------
-                col_widths = {M: 6, N: 7, O: 4, P: 6, Q: 4, R: 4, S: 28, T: 10}
+                col_widths = {P: 6, Q: 7, R: 4, S: 6, T: 4, U: 4, V: 28, W: 10}
                 for col_num, width in col_widths.items():
                     col_letter = get_column_letter(col_num)
                     cd = ws.column_dimensions[col_letter]
@@ -1558,7 +1558,8 @@ class analisi:
         from config import (NOME_VR8h_totale, 
                             NOME_VR8h_riepilogo,
                             Nome_colonna_IDgrom,
-                            Nome_colonna_Descrizione_GrOm)
+                            Nome_colonna_Descrizione_GrOm,
+                            NOME_VR8h_aggiornato)
 
         # ----------------------------------------------------------------
         # STEP 1 — Lettura unici valori gruppi omogenei
@@ -1653,7 +1654,15 @@ class analisi:
         # ----------------------------------------------------------------
         df_summary = pd.DataFrame(summary_rows)
         df_summary.to_excel(os.path.join(output_dir, NOME_VR8h_riepilogo), index=False, sheet_name='Riepilogo')
+        
 
+
+        # Rendiamo belli gli exccel
+        exel_file.inserisci_valutazione_schede(os.path.join(output_dir,NOME_VR8h_riepilogo),
+                                                os.path.join(output_dir,NOME_VR8h_totale),
+                                                os.path.join(output_dir, NOME_VR8h_aggiornato))
+        exel_file.colora_classe_rischio(os.path.join(output_dir,NOME_VR8h_riepilogo))
+        
         print(f'\n###\nanalisi_8h completata.\nDati salvati in {output_dir}\n###')
 
 
