@@ -1658,9 +1658,15 @@ class analisi:
 
 
         # Rendiamo belli gli exccel
+        exel_file.formatting_excel_VR8h_totale(os.path.join(output_dir,NOME_VR8h_totale),
+                                                            os.path.join(output_dir,NOME_VR8h_totale))
+        
+        
         exel_file.inserisci_valutazione_schede(os.path.join(output_dir,NOME_VR8h_riepilogo),
                                                 os.path.join(output_dir,NOME_VR8h_totale),
                                                 os.path.join(output_dir, NOME_VR8h_aggiornato))
+        
+        
         exel_file.colora_classe_rischio(os.path.join(output_dir,NOME_VR8h_riepilogo))
         
         print(f'\n###\nanalisi_8h completata.\nDati salvati in {output_dir}\n###')
