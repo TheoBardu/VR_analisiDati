@@ -1869,8 +1869,8 @@ class analisi:
         #leggi df DPI
         try:
             df_dpi = pd.read_excel(excel_info_scheda_dpi, sheet_name=SCHEDA_DPI, header=1)
-            df_dpi['PNR'] = 0 #inizializzo a zero la colonna PNR
-            df_dpi['LeqA_rid'] = 0 #inizializzo a zero la nuova colonna LeqA_rid
+            df_dpi['PNR'] = 0.0 #inizializzo a zero la colonna PNR
+            df_dpi['LeqA_rid'] = 0.0 #inizializzo a zero la nuova colonna LeqA_rid
 
         except FileNotFoundError:
             print(f'File {excel_info_scheda_dpi} not found. Check it out')
@@ -1896,12 +1896,14 @@ class analisi:
 
         # ── Step 2: itera sulle schede e sui DPI  ───────────────────────────────
         for idx_sn, sn in enumerate(sheet_names_heg): #itero sulle schede omogenee
-            for dpi_idx in range(len(df_dpi)): #itero sui dpi
+            
+            #itero sui dpi
+            for dpi_idx in range(len(df_dpi)): 
                 df_heg = pd.read_excel(excel_total, sheet_name=sn) #leggo il foglio heg e mi salvo i dati
                 dpi = df_dpi.loc[dpi_idx] #seleziono la riga del dpi con le informazioni
 
                 print(f'\n── {dpi.codice_DPI} | {dpi.Marca} {dpi.Modello} '
-                    f'| β={dpi.Beta}  H\'={dpi.H:.2f}  M\'={dpi.M:.2f}  L\'={dpi.L:.2f} ──')
+                    f'| β={dpi.Beta}  H={dpi.H:.2f}  M={dpi.M:.2f}  L={dpi.L:.2f} ──')
 
                 # ── Calcolo PNR vettorializzato ───────────────────────────────
                 diff_C_A = df_heg['LeqC'] - df_heg['LeqA']
@@ -1912,48 +1914,156 @@ class analisi:
                     dpi.Beta*dpi.M - (dpi.H * dpi.Beta - dpi.L * dpi.Beta) / 8 * (diff_C_A - 2)    # diff >  2
                 )
 
+                PNR = PNR.mean()
 
                 df_dpi.loc[dpi_idx, 'PNR'] = (PNR).round(1) #salvo PNR in nel df dpi
                 df_dpi.loc[dpi_idx, 'LeqA_rid'] = (df_riepilogo.loc[idx_sn,'Lex_max'] - PNR).round(1) #savo LeqA_rid
 
-                # TODO da qui, prendere df_dpi e salvare la riga nell'excel
-                
-
                 
 
 
+                # ── Scrittura su excel_aggiornato ────────────────────────────────────
+            
+            from openpyxl.styles import Font
+            from config import COL_INIZIO_DPI, FIND_TESTO_FINE_TABELLA_VALUTAZIONE, SEPARAZIONE_RIGHE_DA_VALUTAZIONE
+            # ── CONFIGURAZIONE ─────────────────────────────────────────────────
+            # Colonna di ancoraggio della sezione DPI (14 = colonna N)
+            COL_INIZIO = COL_INIZIO_DPI
+
+            # Stringa da cercare in COL_INIZIO per localizzare la fine
+            # della tabella VALUTAZIONE SU BASE GIORNALIERA
+            TESTO_FINE_VALUTAZIONE = FIND_TESTO_FINE_TABELLA_VALUTAZIONE
+
+            # Righe vuote da lasciare tra fine VALUTAZIONE e titolo sezione DPI
+            RIGHE_VUOTE_SEP = SEPARAZIONE_RIGHE_DA_VALUTAZIONE
+
+            # Testo del titolo della nuova sezione
+            TESTO_TITOLO_SEZIONE = "Analisi DPI in dotazione"
+
+            # Colonna di df_dpi che occupa più di una cella fisica nel foglio
+            NOME_COL_MERGE = 'Marca'
+            SPAN_MERGE     = 2          # celle fisiche occupate (es. O+P)
+
+            # Colonna di df_dpi su cui applicare il colore di rischio
+            NOME_COL_COLORE = 'LeqA_rid'
+
+            # Soglie colore per NOME_COL_COLORE
+            # val < SOGLIA_ARANCIONE_MAX                               → arancione
+            # SOGLIA_ARANCIONE_MAX <= val <= SOGLIA_VERDE_MIN           → giallo
+            # SOGLIA_VERDE_MIN < val < SOGLIA_VERDE_MAX                 → verde
+            # SOGLIA_VERDE_MAX <= val <= SOGLIA_ROSSO_MIN               → giallo
+            # val > SOGLIA_ROSSO_MIN                                   → rosso
+            SOGLIA_ARANCIONE_MAX = 65
+            SOGLIA_VERDE_MIN     = 70
+            SOGLIA_VERDE_MAX     = 75
+            SOGLIA_ROSSO_MIN     = 80
+            COLORE_ARANCIONE = 'FF8C00'
+            COLORE_GIALLO    = 'FFD700'
+            COLORE_VERDE     = '008000'
+            COLORE_ROSSO     = 'DC143C'
+
+            # ── Calcola offset fisici per ogni colonna di df_dpi ──────────────
+            # NOME_COL_MERGE occupa SPAN_MERGE celle, tutte le altre 1 cella
+            _offset_corrente = 0
+            col_offsets = {}   # {nome_colonna_df: offset_intero_da_COL_INIZIO}
+            for col in df_dpi.columns:
+                col_offsets[col] = _offset_corrente
+                _offset_corrente += SPAN_MERGE if col == NOME_COL_MERGE else 1
+            larghezza_sezione = _offset_corrente  # celle fisiche totali della sezione
+
+            # ── Apri workbook e seleziona il foglio corrente ──────────────────
+            wb_ag = ex.load_workbook(excel_aggiornato)
+            ws_ag = wb_ag[sn]
+
+            # ── Trova dinamicamente l'ultima riga della tabella VALUTAZIONE ───
+            # Se la cella appartiene a un merge, si usa l'ultima riga del range
+            ultima_riga_val = None
+            for row_cells in ws_ag.iter_rows(min_col=COL_INIZIO, max_col=COL_INIZIO):
+                cell = row_cells[0]
+                if cell.value and TESTO_FINE_VALUTAZIONE in str(cell.value):
+                    ultima_riga_val = cell.row
+                    for mr in ws_ag.merged_cells.ranges:
+                        if mr.min_row == cell.row and mr.min_col == COL_INIZIO:
+                            ultima_riga_val = mr.max_row
+                            break
+                    break
+
+            if ultima_riga_val is None:
+                print(f"[WARN] '{TESTO_FINE_VALUTAZIONE}' non trovato nel foglio "
+                        f"'{sn}': scrittura DPI saltata.")
+                wb_ag.close()
+            else:
+                # ── Calcola righe e colonne di sezione ───────────────────────
+                riga_titolo       = ultima_riga_val + RIGHE_VUOTE_SEP + 1
+                riga_intestazioni = riga_titolo + 1
+                riga_dati_base    = riga_intestazioni + 1
+                col_fine_sezione  = COL_INIZIO + larghezza_sezione - 1
+                col_merge         = COL_INIZIO + col_offsets[NOME_COL_MERGE]
+                col_colore        = COL_INIZIO + col_offsets[NOME_COL_COLORE]
+
+                # ── Titolo sezione: merged su tutta la larghezza, bold ────────
+                ws_ag.merge_cells(
+                    start_row=riga_titolo,   start_column=COL_INIZIO,
+                    end_row=riga_titolo,     end_column=col_fine_sezione
+                )
+                cell_titolo       = ws_ag.cell(row=riga_titolo, column=COL_INIZIO)
+                cell_titolo.value = TESTO_TITOLO_SEZIONE
+                cell_titolo.font  = Font(bold=True)
+
+                # ── Intestazioni colonne: nomi da df_dpi.columns, bold ────────
+                # NOME_COL_MERGE ha il merge su SPAN_MERGE celle
+                for nome_col, offset in col_offsets.items():
+                    cell_hdr       = ws_ag.cell(row=riga_intestazioni,
+                                                column=COL_INIZIO + offset)
+                    cell_hdr.value = nome_col
+                    cell_hdr.font  = Font(bold=True)
+                ws_ag.merge_cells(
+                    start_row=riga_intestazioni, start_column=col_merge,
+                    end_row=riga_intestazioni,   end_column=col_merge + SPAN_MERGE - 1
+                )
+
+                # ── Righe dati: una per DPI, valori da df_dpi ────────────────
+                for i in range(len(df_dpi)):
+                    riga_corrente = riga_dati_base + i
+
+                    for nome_col, offset in col_offsets.items():
+                        ws_ag.cell(row=riga_corrente,
+                                    column=COL_INIZIO + offset).value = \
+                            df_dpi.loc[i, nome_col]
+
+                    # Merge cella NOME_COL_MERGE
+                    ws_ag.merge_cells(
+                        start_row=riga_corrente, start_column=col_merge,
+                        end_row=riga_corrente,   end_column=col_merge + SPAN_MERGE - 1
+                    )
+
+                    # Colore cella NOME_COL_COLORE in base al livello di rischio
+                    val_colore = df_dpi.loc[i, NOME_COL_COLORE]
+                    if val_colore < SOGLIA_ARANCIONE_MAX:
+                        hex_colore = COLORE_ARANCIONE
+                    elif val_colore > SOGLIA_ROSSO_MIN:
+                        hex_colore = COLORE_ROSSO
+                    elif SOGLIA_VERDE_MIN < val_colore < SOGLIA_VERDE_MAX:
+                        hex_colore = COLORE_VERDE
+                    else:
+                        hex_colore = COLORE_GIALLO
+                    ws_ag.cell(row=riga_corrente, column=col_colore).fill = \
+                        PatternFill(fill_type='solid', fgColor=hex_colore)
+
+                # ── Salva e chiudi ────────────────────────────────────────────
+                wb_ag.save(excel_aggiornato)
+                wb_ag.close()
+                print(f"  → Sezione DPI scritta nel foglio '{sn}' "
+                        f"(riga titolo: {riga_titolo}).")
+                
 
 
-                # Mappa colori per livello di rischio
-                def _get_color(val):
-                    if val < 65:
-                        return 'FF8C00'   # arancione  – iperprotezione
-                    elif val > 80:
-                        return 'DC143C'   # rosso      – insufficiente
-                    elif 65 <= val <= 70 or 75 <= val <= 80:
-                        return 'FFD700'   # giallo sc. – accettabile
-                    elif 70 < val < 75:
-                        return '008000'   # verde      – buona protezione
-                    return None           # nessuna colorazione (non dovrebbe accadere)
 
-                for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
-                    for cell in row:
-                        if get_column_letter(cell.column) == leqa_rid_col \
-                                and cell.value is not None:
-                            try:
-                                color = _get_color(float(cell.value))
-                                if color:
-                                    cell.fill = PatternFill(
-                                        start_color=color,
-                                        end_color=color,
-                                        fill_type='solid'
-                                    )
-                            except (TypeError, ValueError):
-                                pass
 
-                wb.save(out_xlsx)
-                print(f'  Salvato: {out_csv}')
-                print(f'  Salvato: {out_xlsx}')
+
+        
+
+                
 
         print('\nApplicazione DPI HML completata.')
 

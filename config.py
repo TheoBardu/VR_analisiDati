@@ -16,3 +16,8 @@ SCHEDA_DPI = 'Scheda_DPI'
 # Nomi colonne Scheda_HEG_dpi
 Nome_colonna_IDgrom = 'ID_GrOm'
 Nome_colonna_Descrizione_GrOm = 'Descrizione_GrOm'
+
+# VARIABILI VALUAZIONE DPI in excel_aggiornato
+COL_INIZIO_DPI = 14
+FIND_TESTO_FINE_TABELLA_VALUTAZIONE = "CLASSE RISCHIO"
+SEPARAZIONE_RIGHE_DA_VALUTAZIONE = 4
