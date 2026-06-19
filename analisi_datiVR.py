@@ -295,6 +295,14 @@ class exel_file:
                 ws.merge_cells(start_row=min_row, start_column=min_col,
                             end_row=max_row,   end_column=max_col)
 
+        def _last_populated_col(ws) -> int:
+            """Restituisce l'indice (1-based) dell'ultima colonna con almeno un valore."""
+            max_col = 0
+            for row in ws.iter_rows():
+                for cell in row:
+                    if cell.value is not None and cell.column > max_col:
+                        max_col = cell.column
+            return max_col if max_col > 0 else 1
 
         # ---------------------------------------------------------------------------
         # Funzione principale
@@ -368,21 +376,33 @@ class exel_file:
                 fill_classe = _fill(palette["bg"])
                 font_classe_color = palette["font_color"]
 
-                # Colonne: M=13, N=14, O=15, P=16, Q=17, R=18, S=19, T=20
-                P, Q, R, S, T, U, V, W = 16, 17, 18, 19, 20, 21, 22, 23
+                # ------------------------------------------------------------------
+                # Calcola colonna di partenza: ultima col popolata + 3
+                # ------------------------------------------------------------------
+                # MODIFICA: le 8 colonne della tabellina non sono più hardcodate a
+                # M..T (13..20) ma calcolate dinamicamente in base al contenuto del
+                # foglio. col_start = max_col_popolata + 3; col_end = col_start + 7.
+                last_col  = _last_populated_col(ws)
+                col_start = last_col + 3          # prima colonna della tabellina
+                M = col_start
+                N = col_start + 1   # Lex8h
+                O = col_start + 2   # ±
+                P = col_start + 3   # U
+                Q = col_start + 4   # →
+                R = col_start + 5   # (vuota)
+                S = col_start + 6   # "LEX MAX =" / "Massimo dei Lpicco,C..."
+                T = col_start + 7   # valore numerico (col_end)
 
                 # ------------------------------------------------------------------
-                # Riga 2: header "VALUTAZIONE SU BASE GIORNALIERA" (M2:T2 merged)
+                # Riga 2: header "VALUTAZIONE SU BASE GIORNALIERA" (merge col_start:col_end)
                 # ------------------------------------------------------------------
-                # Prima rimuoviamo eventuali merge già presenti nell'area M:T righe 2-6
+                # MODIFICA: la pulizia dei merge esistenti usa col_start/T calcolati
                 for mr in list(ws.merged_cells.ranges):
-                    mc = mr.min_col
-                    mr_min_row = mr.min_row
-                    if mc >= P and mc <= W and mr_min_row >= 2 and mr_min_row <= 6:
+                    if mr.min_col >= M and mr.max_col <= T and 2 <= mr.min_row <= 6:
                         ws.merged_cells.remove(mr)
 
-                _safe_merge(ws, 2, P, 2, W)
-                _set(ws, 2, P,
+                _safe_merge(ws, 2, M, 2, T)
+                _set(ws, 2, M,
                     value="VALUTAZIONE SU BASE GIORNALIERA",
                     font=_font(bold=True, size=14),
                     fill=_fill("FFCCFFCC"),          # indexed 42 -> light green
@@ -390,60 +410,60 @@ class exel_file:
                     border=_border(left=BORDER_MEDIUM, right=BORDER_MEDIUM,
                                     top=BORDER_MEDIUM, bottom=BORDER_MEDIUM))
                 # Celle N2:T2 (parte del merge) — solo bordi top/bottom per il contorno esterno
-                for c in range(Q, W + 1):
+                for c in range(N, T + 1):
                     _set(ws, 2, c,
                         border=_border(top=BORDER_MEDIUM, bottom=BORDER_MEDIUM,
-                                        right=BORDER_MEDIUM if c == W else BORDER_NONE))
+                                        right=BORDER_MEDIUM if c == T else BORDER_NONE))
 
                 # ------------------------------------------------------------------
                 # Riga 3: LEX,8h | Lex8h | ± | U | → |   | LEX MAX = | Lex_max
                 # ------------------------------------------------------------------
                 fill_bianco = _fill("FFFFFFFF")   # sfondo bianco (indexed 9)
 
-                _set(ws, 3, P,
+                _set(ws, 3, M,
                     value="LEX,8h",
                     font=_font(bold=True, size=14),
                     fill=fill_bianco,
                     alignment=_align("center"),
                     border=_border(left=BORDER_MEDIUM))
 
-                _set(ws, 3, Q,
+                _set(ws, 3, N,
                     value=lex8h,
                     font=_font(bold=True, size=14),
                     fill=fill_bianco,
                     alignment=_align("right"))
 
-                _set(ws, 3, R,
+                _set(ws, 3, O,
                     value="±",
                     font=_font(bold=True, size=14),
                     fill=fill_bianco,
                     alignment=_align("center"))
 
-                _set(ws, 3, S,
+                _set(ws, 3, P,
                     value=u,
                     font=_font(bold=True, size=14),
                     fill=fill_bianco,
                     alignment=_align("left"))
 
-                _set(ws, 3, T,
+                _set(ws, 3, Q,
                     value="→",
                     font=_font(bold=False, size=22),
                     fill=fill_bianco,
                     alignment=_align("right"))
 
-                _set(ws, 3, U,
+                _set(ws, 3, R,
                     value=None,
                     font=_font(size=22),
                     fill=fill_bianco,
                     alignment=_align("left"))
 
-                _set(ws, 3, V,
+                _set(ws, 3, S,
                     value="LEX MAX =",
                     font=_font(bold=True, size=14),
                     fill=fill_bianco,
                     alignment=_align("right"))
 
-                _set(ws, 3, W,
+                _set(ws, 3, T,
                     value=lex_max,
                     font=_font(bold=True, size=14),
                     fill=fill_bianco,
@@ -453,20 +473,20 @@ class exel_file:
                 # ------------------------------------------------------------------
                 # Riga 4: (vuota a sinistra) | Massimo dei Lpicco,C misurati = | L_picco_C
                 # ------------------------------------------------------------------
-                for c in range(P, V):
+                for c in range(M, S):
                     _set(ws, 4, c,
                         value=None,
                         fill=fill_bianco,
                         font=_font(size=14),
-                        border=_border(left=BORDER_MEDIUM if c == P else BORDER_NONE))
+                        border=_border(left=BORDER_MEDIUM if c == M else BORDER_NONE))
 
-                _set(ws, 4, V,
+                _set(ws, 4, S,
                     value="Massimo dei Lpicco,C misurati =",
                     font=_font(bold=True, size=14),
                     fill=fill_bianco,
                     alignment=_align("right"))
 
-                _set(ws, 4, W,
+                _set(ws, 4, T,
                     value=l_picco_c,
                     font=_font(bold=True, size=14),
                     fill=fill_bianco,
@@ -476,8 +496,8 @@ class exel_file:
                 # ------------------------------------------------------------------
                 # Righe 5-6: CLASSE RISCHIO (M5:T6 merged, colorato)
                 # ------------------------------------------------------------------
-                _safe_merge(ws, 5, P, 6, W)
-                _set(ws, 5, P,
+                _safe_merge(ws, 5, M, 6, T)
+                _set(ws, 5, M,
                     value=f"CLASSE RISCHIO {classe}",
                     font=_font(bold=True, size=14, color=font_classe_color),
                     fill=fill_classe,
@@ -486,15 +506,15 @@ class exel_file:
                                     top=BORDER_MEDIUM, bottom=BORDER_MEDIUM))
 
                 # Celle della seconda riga del merge (row 6) — bordi del contorno
-                for c in range(Q, W + 1):
+                for c in range(N, T + 1):
                     _set(ws, 6, c,
                         border=_border(bottom=BORDER_MEDIUM,
-                                        right=BORDER_MEDIUM if c == W else BORDER_NONE))
+                                        right=BORDER_MEDIUM if c == T else BORDER_NONE))
 
                 # ------------------------------------------------------------------
                 # Larghezze colonne M:T (se non già impostate)
                 # ------------------------------------------------------------------
-                col_widths = {P: 6, Q: 7, R: 4, S: 6, T: 4, U: 4, V: 28, W: 10}
+                col_widths = {M: 6, N: 7, O: 4, P: 6, Q: 4, R: 4, S: 28, T: 10}
                 for col_num, width in col_widths.items():
                     col_letter = get_column_letter(col_num)
                     cd = ws.column_dimensions[col_letter]
@@ -508,8 +528,8 @@ class exel_file:
                     if rd.height is None or rd.height < 1:
                         rd.height = h
 
-                print(f"  [OK] '{shname}': classe={classe}, Lex8h={lex8h}, U={u}, "
-                    f"Lex_max={lex_max}, L_picco_C={l_picco_c}")
+                print(f"  [OK] '{shname}': col_start={get_column_letter(M)} (last_col={get_column_letter(last_col)}+3), "
+                    f"classe={classe}, Lex8h={lex8h}, U={u}, Lex_max={lex_max}, L_picco_C={l_picco_c}")
 
             # ------------------------------------------------------------------
             # 3. Salva
@@ -1809,13 +1829,12 @@ class analisi:
         exel_file.color_cell_VR8h(VR_8h_dir + '/VR_8h.xlsx')
 
 
-    def applica_DPI_HML(self, excel_info_dir, name_excel_info, output_directory, output_dpi, mode = 'both'):
+    def applica_DPI_HML(self, excel_info_scheda_dpi, excel_total, excel_output, excel_aggiornato):
         '''
-        Funzione che applica il metodo HML per il calcolo dell'attenuazione dei DPI
-        su tutti i file CSV presenti in output_directory e salva i risultati per ogni DPI
-        in sottocartelle dedicate dentro output_dpi.
+        Funzione che applica il metodo HML per il calcolo dell'attenuazione dei DPI.
+        Parte dal file exel totale e calcola l'attenuazione dei dpi. Inserisce poi i valori nell'excel di riepilogo
 
-        Per ogni DPI definito nella scheda e per ogni file CSV del gruppo omogeneo:
+        Per ogni DPI definito nella scheda e per ogni gruppo omogeneo:
             1. Legge i parametri H, L, M, beta e calcola H' = beta*H, L' = beta*L, M' = beta*M
             2. Calcola diff_C_A = LeqC - LeqA riga per riga
             3. Calcola PNR con metodo HML:
@@ -1831,14 +1850,10 @@ class analisi:
                 > 80            : rosso      (#DC143C)
 
         INPUT:
-            excel_info_dir   = <str>, directory del file excel con la scheda DPI
-            name_excel_info  = <str>, nome del file excel con la scheda DPI
-            output_directory = <str>, directory contenente i file CSV dei gruppi omogenei
-            output_dpi       = <str>, directory radice in cui creare le sottocartelle DPI_i
-            mode             = <str>, xlsx per salvare in excel, csv per salvare in csv o both per salvare entrmabi
-
-        OUTPUT:
-            Nessun valore di ritorno. I file vengono salvati su disco.
+            excel_info_scheda_dpi  = <str>, nome del file excel con la scheda DPI
+            excel_total = <str>, path dell'excel totale
+            excel_output = <str>, path dell'excel di output (che può anche essere il riepilogo aggiornato)
+            excel_aggiornato = <str>, path dell'excel di aggiornamento, quello con le tabelle
         '''
         import glob
         import os
@@ -1847,92 +1862,67 @@ class analisi:
         import openpyxl as ex
         from openpyxl.styles import PatternFill
         from openpyxl.utils import get_column_letter
+        from config import SCHEDA_DPI
 
-        # ── Step 1: leggi la scheda DPI ──────────────────────────────────────────
-        df_dpi = files.get_scheda_DPI(excel_info_dir, name_excel_info)
-        if df_dpi is None:
-            print('Errore: impossibile leggere la scheda DPI. Controlla che esista nella directory. Funzione interrotta.')
-            return
+        # ── Step 1: leggi la scheda DPI, schede mansioni e output file ──────────────────────────────────────────
+        
+        #leggi df DPI
+        try:
+            df_dpi = pd.read_excel(excel_info_scheda_dpi, sheet_name=SCHEDA_DPI, header=1)
+            df_dpi['PNR'] = 0 #inizializzo a zero la colonna PNR
+            df_dpi['LeqA_rid'] = 0 #inizializzo a zero la nuova colonna LeqA_rid
 
-        # ── Step 2: lista CSV da processare ──────────────────────────────────────
-        ESCLUSI = {'VR8h_totale.csv', 'VR8h_totale.xlsx'}
-        csv_files = sorted([
-            f for f in glob.glob(os.path.join(output_directory, '*.csv'))
-            if os.path.basename(f) not in ESCLUSI
-        ])
+        except FileNotFoundError:
+            print(f'File {excel_info_scheda_dpi} not found. Check it out')
+            
 
-        if not csv_files:
-            print(f'Nessun file CSV trovato in: {output_directory}')
-            return
+        #  leggi schede mansioni da VR8h totale
+        try:
+            #prendo la lista degli sheet names da excel_total
+            sheet_names_heg = pd.ExcelFile(excel_total).sheet_names 
+        except FileNotFoundError:
+            print(f'{excel_total} file not found')
+        
 
-        # ── Step 3 + 4: itera su DPI e su file CSV ───────────────────────────────
-        for _, dpi_row in df_dpi.iterrows():
+        #Leggi df output file (excel_riepilogo)
+        try:
+            df_riepilogo = pd.read_excel(excel_output,header=0)
+            
+        except FileNotFoundError:
+            print(f"{excel_output} not found")
 
-            # Estrae il numero identificativo dal codice_dpi (es. "DPI1" -> 1)
-            match = re.search(r'\d+', str(dpi_row['codice_dpi']))
-            if not match:
-                print(f'Codice DPI non riconosciuto: {dpi_row["codice_dpi"]} — riga saltata.')
-                continue
-            dpi_idx = match.group()
 
-            # Parametri HML con coefficiente correttivo beta
-            beta = float(dpi_row['beta'])
-            Hp   = beta * float(dpi_row['H'])
-            Mp   = beta * float(dpi_row['M'])
-            Lp   = beta * float(dpi_row['L'])
 
-            # Crea la cartella di output per questo DPI
-            dpi_folder = os.path.join(output_dpi, f'DPI_{dpi_idx}')
-            os.makedirs(dpi_folder, exist_ok=True)
 
-            print(f'\n── DPI_{dpi_idx} | {dpi_row["marca"]} {dpi_row["modello"]} '
-                  f'| β={beta}  H\'={Hp:.2f}  M\'={Mp:.2f}  L\'={Lp:.2f} ──')
+        # ── Step 2: itera sulle schede e sui DPI  ───────────────────────────────
+        for idx_sn, sn in enumerate(sheet_names_heg): #itero sulle schede omogenee
+            for dpi_idx in range(len(df_dpi)): #itero sui dpi
+                df_heg = pd.read_excel(excel_total, sheet_name=sn) #leggo il foglio heg e mi salvo i dati
+                dpi = df_dpi.loc[dpi_idx] #seleziono la riga del dpi con le informazioni
 
-            for csv_path in csv_files:
-                df = pd.read_csv(csv_path)
+                print(f'\n── {dpi.codice_DPI} | {dpi.Marca} {dpi.Modello} '
+                    f'| β={dpi.Beta}  H\'={dpi.H:.2f}  M\'={dpi.M:.2f}  L\'={dpi.L:.2f} ──')
 
                 # ── Calcolo PNR vettorializzato ───────────────────────────────
-                diff_C_A = df['LeqC'] - df['LeqA']
+                diff_C_A = df_heg['LeqC'] - df_heg['LeqA']
 
                 PNR = np.where(
                     diff_C_A <= 2,
-                    Mp - (Hp - Mp) / 4 * (diff_C_A - 2),   # diff <= 2
-                    Mp - (Hp - Lp) / 8 * (diff_C_A - 2)    # diff >  2
+                    dpi.Beta*dpi.M - (dpi.H * dpi.Beta - dpi.M * dpi.Beta) / 4 * (diff_C_A - 2),   # diff <= 2
+                    dpi.Beta*dpi.M - (dpi.H * dpi.Beta - dpi.L * dpi.Beta) / 8 * (diff_C_A - 2)    # diff >  2
                 )
 
-                df['PNR']      = PNR.round(1)
-                df['LeqA_rid'] = (df['LeqA'] - df['PNR']).round(1)
 
-                # ── Nomi file di output ───────────────────────────────────────
-                base_name = os.path.basename(csv_path)           # es. VR8h_M_01.csv
-                stem, _   = base_name.rsplit('.', 1)             # es. VR8h_M_01
-                out_stem  = f'{stem}_dpi_{dpi_idx}'              # es. VR8h_M_01_dpi_1
-                out_csv   = os.path.join(dpi_folder, out_stem + '.csv')
-                out_xlsx  = os.path.join(dpi_folder, out_stem + '.xlsx')
+                df_dpi.loc[dpi_idx, 'PNR'] = (PNR).round(1) #salvo PNR in nel df dpi
+                df_dpi.loc[dpi_idx, 'LeqA_rid'] = (df_riepilogo.loc[idx_sn,'Lex_max'] - PNR).round(1) #savo LeqA_rid
 
-                # ── Salvataggio CSV ───────────────────────────────────────────
-                if mode == 'both' or mode == 'csv':
-                    files.write_csv(df, out_csv)
+                # TODO da qui, prendere df_dpi e salvare la riga nell'excel
+                
 
-                # ── Salvataggio XLSX ──────────────────────────────────────────
-                if mode == 'both' or mode == 'xlsx':
-                    files.write_exel(df, out_xlsx)
+                
 
-                # ── Colorazione celle LeqA_rid ────────────────────────────────
-                wb = ex.load_workbook(out_xlsx)
-                ws = wb.active
 
-                # Trova la lettera della colonna LeqA_rid
-                leqa_rid_col = None
-                for cell in ws[1]:
-                    if cell.value == 'LeqA_rid':
-                        leqa_rid_col = get_column_letter(cell.column)
-                        break
 
-                if leqa_rid_col is None:
-                    print(f'  ATTENZIONE: colonna LeqA_rid non trovata in {out_xlsx}')
-                    wb.save(out_xlsx)
-                    continue
 
                 # Mappa colori per livello di rischio
                 def _get_color(val):

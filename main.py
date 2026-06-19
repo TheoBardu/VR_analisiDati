@@ -58,20 +58,16 @@ def main(main_directory):
     input('Femi qui per ora, DPI da correggere.')
 
     # Applicazione medoto HLM per i DPI sulle misure singole
-    a.applica_DPI_HML(excel_info_dir=main_directory , 
-                      name_excel_info='scheda_gruppi_dpi.xlsx', 
-                      output_directory= main_directory + risultati_directory, 
+    a.applica_DPI_HML(excel_info_scheda_dpi=main_directory , 
+                      excel_total='scheda_gruppi_dpi.xlsx', 
+                      excel_output= main_directory + risultati_directory, 
                       output_dpi= main_directory + risultati_directory + dpi_directory,
                       mode = 'both')
+    
     
 
 
 
-
-    #Calcolo PNR medio e LeqA ridotto sulla mansione
-    a.applica_dpi_HLM_8h(main_dir=main_directory,
-                         dpi_dir=main_directory + risultati_directory + dpi_directory,
-                         total_VR8h_name="VR8h_totale")
     
 
 

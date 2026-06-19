@@ -12,6 +12,7 @@ NOME_VR8h_aggiornato = 'VR8h_totale_aggiornato.xlsx'
 
 # Nomi schede file scheda_gruppi_dpi.xlsx
 SCHEDA_MANSIONI = 'Scheda_mansioni' 
+SCHEDA_DPI = 'Scheda_DPI'
 # Nomi colonne Scheda_HEG_dpi
 Nome_colonna_IDgrom = 'ID_GrOm'
 Nome_colonna_Descrizione_GrOm = 'Descrizione_GrOm'
