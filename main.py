@@ -2,7 +2,7 @@
 
 # This code is the main code for the analysis of the data from the VR acquisitions
 
-from os import chdir, getcwd
+from os import chdir, getcwd, system
 import sys
 from analisi_datiVR import manager, analisi
 
@@ -15,15 +15,15 @@ dpi_directory = '/DPI_check'
 
 
 def main(main_directory):
-    # sys.stdout = open('VR_rumore.out', 'w')
-    chdir(main_directory + misure_directory) # mi sposto nella cartella delle misure
+    # # sys.stdout = open('VR_rumore.out', 'w')
+    # chdir(main_directory + misure_directory) # mi sposto nella cartella delle misure
     
-    # ==========================================================================
-    # Inizializzazione: lettura file e creazione tabelle =====================================
+    # # ==========================================================================
+    # # Inizializzazione: lettura file e creazione tabelle =====================================
 
-    m = manager() # inizializzazione delle directory e dei file
-    m.iterate_directory(file_name = 'dati.txt',format='csv') #iterazione su tutte le cartelle contenenti i dati .txt per salvare xls e csv
-    # ==========================================================================
+    # m = manager() # inizializzazione delle directory e dei file
+    # m.iterate_directory(file_name = 'dati.txt',format='csv') #iterazione su tutte le cartelle contenenti i dati .txt per salvare xls e csv
+    # # ==========================================================================
 
     # ==========================================================================
     # analisi dei dati acquisiti =====================================
@@ -56,15 +56,14 @@ def main(main_directory):
     a.analisi_8h(main_directory + risultati_directory, df_HEG)
     
     input('Femi qui per ora, DPI da correggere.')
-    
-    data_folder = main_directory + misure_directory + '/data' 
-    a = analisi(data_folder)
 
     # Applicazione medoto HLM per i DPI sulle misure singole
+    system('cd ..')
+
     a.applica_DPI_HML(excel_info_scheda_dpi=main_directory + '/scheda_gruppi_dpi.xlsx' , 
-                      excel_total=main_directory + '/VR8h_totale.xlsx', 
-                      excel_output= main_directory + '/VR8h_riepilogo.xlsx',
-                      excel_aggiornato=main_directory + '/VR8h_totale_aggiornato.xlsx')
+                      excel_total=main_directory + risultati_directory + '/VR8h_totale.xlsx', 
+                      excel_output= main_directory + risultati_directory + '/VR8h_riepilogo.xlsx',
+                      excel_aggiornato=main_directory + risultati_directory + '/VR8h_totale_aggiornato.xlsx')
     
     
 

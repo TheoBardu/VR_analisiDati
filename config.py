@@ -18,6 +18,6 @@ Nome_colonna_IDgrom = 'ID_GrOm'
 Nome_colonna_Descrizione_GrOm = 'Descrizione_GrOm'
 
 # VARIABILI VALUAZIONE DPI in excel_aggiornato
-COL_INIZIO_DPI = 14
+COL_INIZIO_DPI = 16
 FIND_TESTO_FINE_TABELLA_VALUTAZIONE = "CLASSE RISCHIO"
 SEPARAZIONE_RIGHE_DA_VALUTAZIONE = 4

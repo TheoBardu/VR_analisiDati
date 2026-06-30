@@ -35,6 +35,7 @@ class exel_file:
         import shutil
         import openpyxl
         from openpyxl.utils import get_column_letter
+        from builtins import max as builtin_max
 
         
         if not path.isfile(file_path):
@@ -65,12 +66,12 @@ class exel_file:
                         # Lunghezza del valore come stringa
                         content_len = len(str(cell.value))
                         col_idx = cell.column          # intero 1-based
-                        col_widths[col_idx] = max(col_widths.get(col_idx, 0), content_len)
+                        col_widths[col_idx] = builtin_max(col_widths.get(col_idx, 0), content_len)
 
             for col_idx, width in col_widths.items():
                 col_letter = get_column_letter(col_idx)
                 # Aggiungi un piccolo margine e imposta un minimo di 8
-                ws.column_dimensions[col_letter].width = max(width + 2, 8)
+                ws.column_dimensions[col_letter].width = builtin_max(width + 2, 8)
 
             # ── 2. COLORI COLONNE (dalla riga 2 in poi) ───────────────────────
             color_map = {
