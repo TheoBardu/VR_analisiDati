@@ -2001,11 +2001,13 @@ class analisi:
                 col_fine_sezione  = COL_INIZIO + larghezza_sezione - 1
                 col_merge         = COL_INIZIO + col_offsets[NOME_COL_MERGE]
                 col_colore        = COL_INIZIO + col_offsets[NOME_COL_COLORE]
+                NOME_COL_VALUTAZIONE = 'Valutazione efficacia'
+                col_valutazione   = col_fine_sezione + 1
 
                 # ── Titolo sezione: merged su tutta la larghezza, bold ────────
                 ws_ag.merge_cells(
                     start_row=riga_titolo,   start_column=COL_INIZIO,
-                    end_row=riga_titolo,     end_column=col_fine_sezione
+                    end_row=riga_titolo,     end_column=col_valutazione
                 )
                 cell_titolo       = ws_ag.cell(row=riga_titolo, column=COL_INIZIO)
                 cell_titolo.value = TESTO_TITOLO_SEZIONE
@@ -2022,6 +2024,9 @@ class analisi:
                     start_row=riga_intestazioni, start_column=col_merge,
                     end_row=riga_intestazioni,   end_column=col_merge + SPAN_MERGE - 1
                 )
+                cell_hdr_val       = ws_ag.cell(row=riga_intestazioni, column=col_valutazione)
+                cell_hdr_val.value = NOME_COL_VALUTAZIONE
+                cell_hdr_val.font  = Font(bold=True)
 
                 # ── Righe dati: una per DPI, valori da df_dpi ────────────────
                 for i in range(len(df_dpi)):
@@ -2050,6 +2055,17 @@ class analisi:
                         hex_colore = COLORE_GIALLO
                     ws_ag.cell(row=riga_corrente, column=col_colore).fill = \
                         PatternFill(fill_type='solid', fgColor=hex_colore)
+
+                    val_leqa = df_dpi.loc[i, 'LeqA_rid']
+                    if val_leqa < 65:
+                        valutazione = 'iperprotezione'
+                    elif val_leqa >= 80:
+                        valutazione = 'insufficiente'
+                    elif 70 <= val_leqa <= 75:
+                        valutazione = 'buona'
+                    else:
+                        valutazione = 'accettabile'
+                    ws_ag.cell(row=riga_corrente, column=col_valutazione).value = valutazione
 
                 # ── Salva e chiudi ────────────────────────────────────────────
                 wb_ag.save(excel_aggiornato)
