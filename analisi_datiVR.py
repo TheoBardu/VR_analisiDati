@@ -2004,10 +2004,25 @@ class analisi:
                 NOME_COL_VALUTAZIONE = 'Valutazione efficacia'
                 col_valutazione   = col_fine_sezione + 1
 
+                # ── Colonna Lpicco_rid: attiva solo se il Massimo dei Lpicco,C ─
+                # (riga 4, cercato per etichetta) supera la soglia ──────────────
+                NOME_COL_LPICCO_RID = 'Lpicco_rid'
+                SOGLIA_LPICCO_MAX = 135
+                col_lpicco_rid = col_valutazione + 1
+
+                lpicco_max = None
+                for cell in ws_ag[4]:
+                    if cell.value and "Massimo dei Lpicco" in str(cell.value):
+                        lpicco_max = ws_ag.cell(row=4, column=cell.column + 1).value
+                        break
+
+                scrivi_lpicco_rid = isinstance(lpicco_max, (int, float)) and lpicco_max > SOGLIA_LPICCO_MAX
+                col_fine_reale = col_lpicco_rid if scrivi_lpicco_rid else col_valutazione
+
                 # ── Titolo sezione: merged su tutta la larghezza, bold ────────
                 ws_ag.merge_cells(
                     start_row=riga_titolo,   start_column=COL_INIZIO,
-                    end_row=riga_titolo,     end_column=col_valutazione
+                    end_row=riga_titolo,     end_column=col_fine_reale
                 )
                 cell_titolo       = ws_ag.cell(row=riga_titolo, column=COL_INIZIO)
                 cell_titolo.value = TESTO_TITOLO_SEZIONE
@@ -2027,6 +2042,11 @@ class analisi:
                 cell_hdr_val       = ws_ag.cell(row=riga_intestazioni, column=col_valutazione)
                 cell_hdr_val.value = NOME_COL_VALUTAZIONE
                 cell_hdr_val.font  = Font(bold=True)
+
+                if scrivi_lpicco_rid:
+                    cell_hdr_lpicco       = ws_ag.cell(row=riga_intestazioni, column=col_lpicco_rid)
+                    cell_hdr_lpicco.value = NOME_COL_LPICCO_RID
+                    cell_hdr_lpicco.font  = Font(bold=True)
 
                 # ── Righe dati: una per DPI, valori da df_dpi ────────────────
                 for i in range(len(df_dpi)):
@@ -2066,6 +2086,21 @@ class analisi:
                     else:
                         valutazione = 'accettabile'
                     ws_ag.cell(row=riga_corrente, column=col_valutazione).value = valutazione
+
+                    # Colonna Lpicco_rid = Lpicco_max - L(DPI) - 5, colorata verde/rosso
+                    if scrivi_lpicco_rid:
+                        val_l_dpi   = df_dpi.loc[i, 'L']
+                        lpicco_rid  = round(lpicco_max - val_l_dpi - 5, 1)
+                        cell_lpicco = ws_ag.cell(row=riga_corrente, column=col_lpicco_rid)
+                        cell_lpicco.value = lpicco_rid
+                        if lpicco_rid < SOGLIA_LPICCO_MAX:
+                            hex_lpicco = COLORE_VERDE
+                        elif lpicco_rid > SOGLIA_LPICCO_MAX:
+                            hex_lpicco = COLORE_ROSSO
+                        else:
+                            hex_lpicco = None
+                        if hex_lpicco:
+                            cell_lpicco.fill = PatternFill(fill_type='solid', fgColor=hex_lpicco)
 
                 # ── Salva e chiudi ────────────────────────────────────────────
                 wb_ag.save(excel_aggiornato)

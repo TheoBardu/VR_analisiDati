@@ -7,7 +7,7 @@ import sys
 from analisi_datiVR import manager, analisi
 
 # La main directory deve essere la root (quindi la cartella dell'azienda)
-main_directory = '/Users/theo/Desktop/P.IVA/Aziende/Ermes/Lavori/Ferrobac/1/rev/rev3/Rumore'
+main_directory = '/Users/theo/Desktop/P.IVA/Aziende/Ermes/Lavori/Ferrobac/2/rev/rev3/Rumore'
 misure_directory = '/misure'
 risultati_directory = '/output'
 dpi_directory = '/DPI_check'
@@ -67,6 +67,7 @@ def main(main_directory):
     
     # Creazione del file excel
     system(f"python /Users/theo/Desktop/P.IVA/Aziende/Ermes/Codici/VRR_analisiDati/VRR_analisiDati/utility/crea_excel_dati.py {data_folder} {main_directory} --output Tab-Mis.xlsx")
+    print('Tab-Mis.xlsx creato correttamente')
 
 
 
