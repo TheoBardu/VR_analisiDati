@@ -34,7 +34,7 @@ def main(main_directory):
     # # print(df_avg)
     
     # Copio le info dei GrOm e Ti dal file excel
-    a.get_scheda_info(df_avg, excel_info_dir=main_directory)     
+    # a.get_scheda_info(df_avg, excel_info_dir=main_directory)     
 
     str_print_4input = '''
     §§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§
