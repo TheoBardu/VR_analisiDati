@@ -5,9 +5,10 @@
 from os import chdir, getcwd, system
 import sys
 from analisi_datiVR import manager, analisi
+from config import NAME_RILIEVI_FONOMETRICI
 
 # La main directory deve essere la root (quindi la cartella dell'azienda)
-main_directory = '/Users/theo/Desktop/P.IVA/Aziende/Ermes/Lavori/Ferrobac/2/rev/rev3/Rumore'
+main_directory = '/Users/theo/Desktop/P.IVA/Aziende/Ermes/Lavori/Siderflange/2/rev1/Rumore'
 misure_directory = '/misure'
 risultati_directory = '/output'
 dpi_directory = '/DPI_check'
@@ -66,8 +67,9 @@ def main(main_directory):
                       excel_aggiornato=main_directory + risultati_directory + '/VR8h_totale_aggiornato.xlsx')
     
     # Creazione del file excel
-    system(f"python /Users/theo/Desktop/P.IVA/Aziende/Ermes/Codici/VRR_analisiDati/VRR_analisiDati/utility/crea_excel_dati.py {data_folder} {main_directory} --output Tab-Mis.xlsx")
-    print('Tab-Mis.xlsx creato correttamente')
+    
+    system(f"python /Users/theo/Desktop/P.IVA/Aziende/Ermes/Codici/VRR_analisiDati/VRR_analisiDati/utility/crea_excel_dati.py {data_folder} {main_directory} --output {NAME_RILIEVI_FONOMETRICI}")
+    print(f'{NAME_RILIEVI_FONOMETRICI} creato correttamente')
 
 
 

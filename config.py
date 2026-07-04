@@ -4,6 +4,8 @@ READING_EXEL_DATA_FOLDER_NAME = ["misA", "misB","misC","misG","misH"]
 
 SHEET_NAME_XLSX = 'Profilo storico'
 
+#Variabile per la scrittura
+NAME_RILIEVI_FONOMETRICI = "Rilievi_Fonometrici.xlsx"
 
 # Variabili per la lettura del file modello_scheda_gruppi_dpi
 NOME_VR8h_totale = 'VR8h_totale.xlsx'
