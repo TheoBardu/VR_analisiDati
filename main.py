@@ -8,7 +8,7 @@ from analisi_datiVR import manager, analisi
 from config import NAME_RILIEVI_FONOMETRICI
 
 # La main directory deve essere la root (quindi la cartella dell'azienda)
-main_directory = '/Users/theo/Desktop/P.IVA/Aziende/Ermes/Lavori/Siderflange/2/rev1/Rumore'
+main_directory = '/Users/theo/Desktop/P.IVA/Aziende/Ermes/Lavori/SITITALIA spa.p/rev/rev8/Rumore'
 misure_directory = '/misure'
 risultati_directory = '/output'
 dpi_directory = '/DPI_check'
@@ -68,7 +68,7 @@ def main(main_directory):
     
     # Creazione del file excel
     
-    system(f"python /Users/theo/Desktop/P.IVA/Aziende/Ermes/Codici/VRR_analisiDati/VRR_analisiDati/utility/crea_excel_dati.py {data_folder} {main_directory} --output {NAME_RILIEVI_FONOMETRICI}")
+    system(f"python /Users/theo/Desktop/P.IVA/Aziende/Ermes/Codici/VRR_analisiDati/VRR_analisiDati/utility/crea_excel_dati.py '{data_folder}' '{main_directory}' --output {NAME_RILIEVI_FONOMETRICI}")
     print(f'{NAME_RILIEVI_FONOMETRICI} creato correttamente')
 
 
