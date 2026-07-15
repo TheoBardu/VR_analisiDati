@@ -547,7 +547,7 @@ class files:
     Classe che serve per leggere e scrivere i file
     '''
 
-    def read_measure_file(file, letter_ID, format='csv',ntrack = 6, decimals = 1):
+    def read_measure_file(file, letter_ID, format='csv',ntrack = 6, decimals = 1, read_version = '1'):
         '''
         Funzione che legge il file di misura in txt o csv e restituisce un dataframe pandas.
 
@@ -556,6 +556,8 @@ class files:
             letter_ID = <str>, lettera della cartella dati (tipicamente D,E,F o W)
             format = <str>, "txt" o "csv" a seconda se leggere in txt o csv
             ntrack = <int>, default = 3. Solo per format = 'csv'. Numero di tracce di divisione del file intero.
+            decimals = <int>, number of decimals in the data
+            version = <str>, versione della modalità del file in lettura. 1 è la vecchia (legge da misE,..) 2 è la nuova (legge dalle sottocartelle di misE,..)
         OUTPUT:
             df = <pd.DataFrame>, dataframe contenente i dati della misura
         '''
@@ -707,25 +709,30 @@ class files:
             LASeq_T = []
             LAIeq_T = []
             
-
-            # Prima di procedere alla lettura dei csv, cerco dove sono i file nelle sottocartelle
-            all_subdirs = [
-                d for d in glob.glob('*')
-                if path.isdir(d) and re.search(r'_(\d+)$', d)
-            ]
-            # ordino i file in ordine crescente 0001, 0002, 0003, ...
-            all_subdirs.sort(key=lambda d: int(re.search(r'_(\d+)$', d).group(1)))
+            if read_version == '1':
+                csv_files = glob.glob('*.csv') # salvo la lista di tutti i file csv che ci sono
+    
             
-            # Per ogni sottocartella, raccoglie i CSV al suo interno (ordinati per nome)
-            csv_files = []
-            for subdir in all_subdirs:
-                found = sorted(glob.glob(path.join(subdir, '*.csv')))
-                csv_files.extend(found)
+            elif read_version == '2':
+                # Prima di procedere alla lettura dei csv, cerco dove sono i file nelle sottocartelle
+                all_subdirs = [
+                    d for d in glob.glob('*')
+                    if path.isdir(d) and re.search(r'_(\d+)$', d)
+                ]
+                # ordino i file in ordine crescente 0001, 0002, 0003, ...
+                all_subdirs.sort(key=lambda d: int(re.search(r'_(\d+)$', d).group(1)))
+                
+                # Per ogni sottocartella, raccoglie i CSV al suo interno (ordinati per nome)
+                csv_files = []
+                for subdir in all_subdirs:
+                    found = sorted(glob.glob(path.join(subdir, '*.csv')))
+                    csv_files.extend(found)
+                
+            else:
+                print("Errore: read_version non valida. Usa '1' (vecchia modalità) o '2' (nuova modalità).")
          
 
             # Procedo alla creazione del dataframe ============
-
-            # csv_files = glob.glob('*.csv') # salvo la lista di tutti i file csv che ci sono
             csv_files.sort() # riordino per nome la lista dei file
 
             letter_id_number = 1 #inizializzo il numero della misura ad 1 per ogni nuovo file misure ( in modo che d1,d2,d3...f1,f2,f3...)
@@ -1073,7 +1080,7 @@ class manager:
         print(f'Lista dei file nella directory: {self.file_list}') # stampa la lista dei file nella directory principale
 
 
-    def iterate_directory(self,file_name = 'LSOURCES.txt', format = 'txt'):
+    def iterate_directory(self,file_name = 'LSOURCES.txt', format = 'txt', versione_lettura='1'):
         '''
         Funzione che itera su tutte le directory per salvare i file.
         Crea i file csv e xlsx e colora le colonne opportune del file xlsx mediando tutti i dati.
@@ -1273,10 +1280,10 @@ class manager:
                     df = read_W_file_txt('misW.txt','W')
 
                 elif dir in READING_EXEL_DATA_FOLDER_NAME:
-                    df = files.read_measure_file(file_name, letter_ID=list(dir)[-1], format='xlsx') #salvo i DF totale delle misure (A,B,C,G,H)
+                    df = files.read_measure_file(file_name, letter_ID=list(dir)[-1], format='xlsx',read_version=versione_lettura) #salvo i DF totale delle misure (A,B,C,G,H)
 
                 else:
-                    df = files.read_measure_file(file_name,letter_ID=list(dir)[-1], format='csv') # salvo il DF totale delle misure  (D,E,F,ecc)
+                    df = files.read_measure_file(file_name,letter_ID=list(dir)[-1], format='csv', read_version=versione_lettura) # salvo il DF totale delle misure  (D,E,F,ecc)
                 
                 #salvo i file nella cartella opportuna e nelle versioni csv ed exel
                 files.write_csv(df, f'{self.out_file_dir}/{dir}.csv')
