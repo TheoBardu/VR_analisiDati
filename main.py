@@ -8,7 +8,7 @@ from analisi_datiVR import manager, analisi
 from config import NAME_RILIEVI_FONOMETRICI
 
 # La main directory deve essere la root (quindi la cartella dell'azienda)
-main_directory = '/Users/theo/Desktop/P.IVA/Aziende/Ermes/Lavori/ESAL/rev/rev4/Rumore'
+main_directory = '/Users/theo/Desktop/P.IVA/Aziende/Ermes/Lavori/ALLCOOP/rev/revN/Rumore'
 misure_directory = '/misure'
 risultati_directory = '/output'
 dpi_directory = '/DPI_check'
@@ -56,7 +56,7 @@ def main(main_directory):
     # ==========================================================================
     a.analisi_8h(main_directory + risultati_directory, df_HEG)
     
-    input('Femi qui per ora, DPI da correggere.')
+    # input('Femi qui per ora, DPI da correggere.')
 
     # Applicazione medoto HLM per i DPI sulle misure singole
     system('cd ..')
