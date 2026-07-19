@@ -5,7 +5,7 @@
 from os import chdir, getcwd, system
 import sys
 from analisi_datiVR import manager, analisi
-from config import NAME_RILIEVI_FONOMETRICI
+from config import NAME_RILIEVI_FONOMETRICI, NOME_VR8h_aggiornato
 
 # La main directory deve essere la root (quindi la cartella dell'azienda)
 main_directory = '/Users/theo/Desktop/P.IVA/Aziende/Ermes/Lavori/ALLCOOP/rev/revN/Rumore'
@@ -69,6 +69,10 @@ def main(main_directory):
     # Creazione del file excel per rilievi fonometrici
     system(f"python /Users/theo/Desktop/P.IVA/Aziende/Ermes/Codici/VRR_analisiDati/VRR_analisiDati/utility/crea_excel_dati.py '{data_folder}' '{main_directory}' --output {NAME_RILIEVI_FONOMETRICI}")
     print(f'{NAME_RILIEVI_FONOMETRICI} creato correttamente')
+
+    # Export in PDF di tutti i fogli del file aggiornato
+    excel_document = main_directory + risultati_directory + '/' + NOME_VR8h_aggiornato
+    system(f"python /Users/theo/Desktop/P.IVA/Aziende/Ermes/Codici/VRR_analisiDati/VRR_analisiDati/utility/export_excel2pdf.py '{excel_document}'")
 
 
 
