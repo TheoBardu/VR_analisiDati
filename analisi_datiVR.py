@@ -541,6 +541,204 @@ class exel_file:
         inserisci_valutazione(path_riepilogo, path_totale, path_output)
 
 
+    def transfer_riepilogo2aggiornato(path_riepilogo: str, path_aggiornato: str) -> None:
+        """
+        Copia il foglio 'Riepilogo' di VR8h_riepilogo.xlsx come PRIMO foglio
+        di VR8h_totale_aggiornato.xlsx, mantenendo valori e formattazione
+        (in particolare i colori di classe_rischio impostati da colora_classe_rischio).
+
+        Se il foglio 'Riepilogo' esiste già nel file aggiornato viene rimosso e
+        riscritto, così la funzione è ri-eseguibile senza creare duplicati.
+
+        Parametri
+        ----------
+        path_riepilogo : str
+            Percorso di VR8h_riepilogo.xlsx
+        path_aggiornato : str
+            Percorso di VR8h_totale_aggiornato.xlsx (modificato in place)
+        """
+        import copy
+
+        NOME_FOGLIO = 'Riepilogo'
+
+        wb_r = ex.load_workbook(path_riepilogo)
+        ws_r = wb_r[NOME_FOGLIO] if NOME_FOGLIO in wb_r.sheetnames else wb_r.worksheets[0]
+
+        wb_a = ex.load_workbook(path_aggiornato)
+
+        # Idempotenza: rimuovo un eventuale Riepilogo già presente
+        if NOME_FOGLIO in wb_a.sheetnames:
+            del wb_a[NOME_FOGLIO]
+
+        ws_a = wb_a.create_sheet(NOME_FOGLIO, 0)  # indice 0 -> primo foglio
+
+        # Celle: valori + stili
+        for row in ws_r.iter_rows():
+            for cell in row:
+                new_cell = ws_a.cell(row=cell.row, column=cell.column, value=cell.value)
+                if cell.has_style:
+                    new_cell.font          = copy.copy(cell.font)
+                    new_cell.fill          = copy.copy(cell.fill)
+                    new_cell.border        = copy.copy(cell.border)
+                    new_cell.alignment     = copy.copy(cell.alignment)
+                    new_cell.number_format = cell.number_format
+
+        # Larghezze colonne e altezze righe
+        for key, dim in ws_r.column_dimensions.items():
+            ws_a.column_dimensions[key].width = dim.width
+        for key, dim in ws_r.row_dimensions.items():
+            ws_a.row_dimensions[key].height = dim.height
+
+        # Celle unite
+        for mr in ws_r.merged_cells.ranges:
+            ws_a.merge_cells(str(mr))
+
+        wb_a.save(path_aggiornato)
+        print(f"Foglio '{NOME_FOGLIO}' inserito come primo foglio di: {path_aggiornato}")
+
+
+    def colora_bordi_celle(path: str) -> None:
+        """
+        Applica bordi sottili neri alle celle popolate di tutti i fogli del workbook.
+
+        - Foglio 'Riepilogo': borda l'intero rettangolo di celle popolate (A1 -> ultima
+          riga/colonna con contenuto).
+        - Fogli 'Scheda N': borda in maniera dinamica due aree distinte
+            1. la tabella dati a sinistra (colonna A fino all'ultima colonna
+               dell'intestazione, riga 1 fino all'ultima riga popolata);
+            2. il blocco 'Analisi DPI in dotazione' (se presente), dal titolo fino
+               all'ultima riga/colonna popolata del blocco.
+          Il riquadro 'VALUTAZIONE SU BASE GIORNALIERA' non rientra in queste aree e
+          conserva i suoi bordi 'medium'.
+
+        La funzione è idempotente e non sovrascrive bordi di stile 'medium' già presenti.
+
+        Parametri
+        ----------
+        path : str
+            Percorso del file excel da bordare (modificato in place)
+        """
+        from openpyxl.styles import Border, Side
+        from config import TESTO_TITOLO_DPI
+
+        BORDER_THIN = Side(border_style='thin', color='FF000000')
+
+        def _lato(lato_esistente, applica: bool):
+            """Restituisce il lato da usare: conserva i bordi 'medium' preesistenti."""
+            if lato_esistente is not None and lato_esistente.style == 'medium':
+                return lato_esistente
+            return BORDER_THIN if applica else lato_esistente
+
+        def _applica_bordi(ws, min_row, min_col, max_row, max_col):
+            """
+            Borda il rettangolo indicato. Sulle celle unite disegna solo il perimetro
+            esterno del range, lasciando vuoti i lati interni.
+            """
+            if max_row < min_row or max_col < min_col:
+                return
+
+            # Mappa cella -> range unito di appartenenza
+            merges = list(ws.merged_cells.ranges)
+
+            def _merge_di(r, c):
+                for mr in merges:
+                    if mr.min_row <= r <= mr.max_row and mr.min_col <= c <= mr.max_col:
+                        return mr
+                return None
+
+            for row in ws.iter_rows(min_row=min_row, max_row=max_row,
+                                    min_col=min_col, max_col=max_col):
+                for cell in row:
+                    r, c = cell.row, cell.column
+                    mr = _merge_di(r, c)
+                    if mr is None:
+                        left = top = right = bottom = True
+                    else:
+                        # solo i lati sul perimetro del merge
+                        left   = (c == mr.min_col)
+                        right  = (c == mr.max_col)
+                        top    = (r == mr.min_row)
+                        bottom = (r == mr.max_row)
+
+                    b = cell.border
+                    cell.border = Border(
+                        left=_lato(b.left,   left),
+                        right=_lato(b.right,  right),
+                        top=_lato(b.top,    top),
+                        bottom=_lato(b.bottom, bottom),
+                    )
+
+        def _ultima_riga_popolata(ws, min_col, max_col, from_row=1):
+            """Ultima riga con almeno un valore nell'intervallo di colonne indicato."""
+            last = 0
+            for row in ws.iter_rows(min_row=from_row, min_col=min_col, max_col=max_col):
+                for cell in row:
+                    if cell.value is not None:
+                        last = cell.row
+                        break
+            return last
+
+        def _ultima_col_popolata(ws, min_row, max_row, from_col=1):
+            """Ultima colonna con almeno un valore nell'intervallo di righe indicato."""
+            last = 0
+            for row in ws.iter_rows(min_row=min_row, max_row=max_row, min_col=from_col):
+                for cell in row:
+                    if cell.value is not None and cell.column > last:
+                        last = cell.column
+            return last
+
+        def _ultima_col_contigua(ws, riga=1):
+            """
+            Ultima colonna dell'intestazione prima della prima cella vuota:
+            serve a fermarsi al bordo della tabella dati senza includere i blocchi
+            scritti più a destra (valutazione, DPI).
+            """
+            col = 0
+            for cell in ws[riga]:
+                if cell.value is None:
+                    break
+                col = cell.column
+            return col
+
+        wb = ex.load_workbook(path)
+
+        for ws in wb.worksheets:
+            if ws.max_row == 1 and ws.max_column == 1 and ws['A1'].value is None:
+                continue  # foglio vuoto
+
+            if ws.title.strip().lower().startswith('scheda'):
+                # --- 1. Tabella dati a sinistra -------------------------------
+                max_col_tab = _ultima_col_contigua(ws, riga=1)
+                if max_col_tab > 0:
+                    max_row_tab = _ultima_riga_popolata(ws, 1, max_col_tab)
+                    _applica_bordi(ws, 1, 1, max_row_tab, max_col_tab)
+
+                # --- 2. Blocco 'Analisi DPI in dotazione' ---------------------
+                riga_dpi = col_dpi = None
+                for row in ws.iter_rows():
+                    for cell in row:
+                        if cell.value is not None and TESTO_TITOLO_DPI in str(cell.value):
+                            riga_dpi, col_dpi = cell.row, cell.column
+                            break
+                    if riga_dpi is not None:
+                        break
+
+                if riga_dpi is not None:
+                    max_row_dpi = _ultima_riga_popolata(ws, col_dpi, ws.max_column, from_row=riga_dpi)
+                    max_col_dpi = _ultima_col_popolata(ws, riga_dpi, max_row_dpi, from_col=col_dpi)
+                    _applica_bordi(ws, riga_dpi, col_dpi, max_row_dpi, max_col_dpi)
+
+            else:
+                # Riepilogo (e ogni altro foglio): tutto il blocco popolato
+                max_col = _ultima_col_popolata(ws, 1, ws.max_row)
+                if max_col > 0:
+                    max_row = _ultima_riga_popolata(ws, 1, max_col)
+                    _applica_bordi(ws, 1, 1, max_row, max_col)
+
+        wb.save(path)
+        print(f"Bordi applicati nel file: {path}")
+
+
 
 class files:
     '''
@@ -1696,7 +1894,15 @@ class analisi:
         
         
         exel_file.colora_classe_rischio(os.path.join(output_dir,NOME_VR8h_riepilogo))
-        
+
+
+        # Inserisco il riepilogo come primo foglio del file aggiornato
+        exel_file.transfer_riepilogo2aggiornato(os.path.join(output_dir,NOME_VR8h_riepilogo),
+                                                os.path.join(output_dir,NOME_VR8h_aggiornato))
+
+        # Bordi neri sulle celle popolate
+        exel_file.colora_bordi_celle(os.path.join(output_dir,NOME_VR8h_aggiornato))
+
         print(f'\n###\nanalisi_8h completata.\nDati salvati in {output_dir}\n###')
 
 
@@ -1933,7 +2139,7 @@ class analisi:
                 # ── Scrittura su excel_aggiornato ────────────────────────────────────
             
             from openpyxl.styles import Font
-            from config import COL_INIZIO_DPI, FIND_TESTO_FINE_TABELLA_VALUTAZIONE, SEPARAZIONE_RIGHE_DA_VALUTAZIONE
+            from config import COL_INIZIO_DPI, FIND_TESTO_FINE_TABELLA_VALUTAZIONE, SEPARAZIONE_RIGHE_DA_VALUTAZIONE, TESTO_TITOLO_DPI
             # ── CONFIGURAZIONE ─────────────────────────────────────────────────
             # Colonna di ancoraggio della sezione DPI (14 = colonna N)
             COL_INIZIO = COL_INIZIO_DPI
@@ -1946,7 +2152,7 @@ class analisi:
             RIGHE_VUOTE_SEP = SEPARAZIONE_RIGHE_DA_VALUTAZIONE
 
             # Testo del titolo della nuova sezione
-            TESTO_TITOLO_SEZIONE = "Analisi DPI in dotazione"
+            TESTO_TITOLO_SEZIONE = TESTO_TITOLO_DPI
 
             # Colonna di df_dpi che occupa più di una cella fisica nel foglio
             NOME_COL_MERGE = 'Marca'
@@ -2123,6 +2329,9 @@ class analisi:
         
 
                 
+
+        # Ri-applico i bordi per includere anche le sezioni DPI appena scritte
+        exel_file.colora_bordi_celle(excel_aggiornato)
 
         print('\nApplicazione DPI HML completata.')
 

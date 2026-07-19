@@ -66,8 +66,7 @@ def main(main_directory):
                       excel_output= main_directory + risultati_directory + '/VR8h_riepilogo.xlsx',
                       excel_aggiornato=main_directory + risultati_directory + '/VR8h_totale_aggiornato.xlsx')
     
-    # Creazione del file excel
-    
+    # Creazione del file excel per rilievi fonometrici
     system(f"python /Users/theo/Desktop/P.IVA/Aziende/Ermes/Codici/VRR_analisiDati/VRR_analisiDati/utility/crea_excel_dati.py '{data_folder}' '{main_directory}' --output {NAME_RILIEVI_FONOMETRICI}")
     print(f'{NAME_RILIEVI_FONOMETRICI} creato correttamente')
 
