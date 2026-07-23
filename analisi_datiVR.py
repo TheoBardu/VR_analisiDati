@@ -906,11 +906,12 @@ class files:
             PeakC_eq = []
             LASeq_T = []
             LAIeq_T = []
-            
+
+            # Vecchia versione del firmware: i file csv sono tutti nella stessa cartella
             if read_version == '1':
                 csv_files = glob.glob('*.csv') # salvo la lista di tutti i file csv che ci sono
     
-            
+            # Nuova versione del firmware: i file csv sono in sottocartelle separate
             elif read_version == '2':
                 # Prima di procedere alla lettura dei csv, cerco dove sono i file nelle sottocartelle
                 all_subdirs = [

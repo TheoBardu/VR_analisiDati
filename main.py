@@ -12,6 +12,7 @@ main_directory = '/Users/theo/Desktop/P.IVA/Aziende/Ermes/Lavori/ALLCOOP/rev/rev
 misure_directory = '/misure'
 risultati_directory = '/output'
 dpi_directory = '/DPI_check'
+VERSIONE_FIRMWARE = '2' # versione del firmware del VR (1 o 2)
 
 
 
@@ -23,7 +24,7 @@ def main(main_directory):
     # Inizializzazione: lettura file e creazione tabelle =====================================
 
     m = manager() # inizializzazione delle directory e dei file
-    m.iterate_directory(file_name = 'dati.txt',format='csv', versione_lettura='1') #iterazione su tutte le cartelle contenenti i dati .txt per salvare xls e csv
+    m.iterate_directory(file_name = 'dati.txt',format='csv', versione_lettura=VERSIONE_FIRMWARE) #iterazione su tutte le cartelle contenenti i dati .txt per salvare xls e csv
     # ==========================================================================
 
     # ==========================================================================
