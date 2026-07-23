@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 
 import openpyxl
 
-file2extend = "/Users/theo/Desktop/P.IVA/Aziende/Ermes/Lavori/DEFRANCESCHI/rev/rev0/Rumore/misure/misH/730 A10574-26070313-105933.xlsx"
+file2extend = '/Users/theo/Desktop/P.IVA/Aziende/Ermes/Lavori/DEFRANCESCHI/rev/rev0/Rumore/misure/misH/730 A10574-26070313-105933.xlsx'
 Ttot = 6  # durata minima desiderata in minuti
 
 SHEET_NAME = "Profilo storico"
