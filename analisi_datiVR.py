@@ -1072,39 +1072,42 @@ class files:
                 
                 # Popolo il dataframe totale
                 ntrack_id_letter = 1 #variabile che mi tiene conto del numero di traccia di una misura (es: D1 track 1, D1 trak 2, D1 track 3, ...)
-                for i in range(ntrack):
-                    fileIDs.append(file) #salvo il nome del file 
-                    letter_IDs.append(letter_ID + str(letter_id_number)) #salvo la lettera del file
-                    ntrack_id.append(ntrack_id_letter)
-                    ntrack_id_letter += 1
+                try:
+                    for i in range(ntrack):
+                        fileIDs.append(file) #salvo il nome del file 
+                        letter_IDs.append(letter_ID + str(letter_id_number)) #salvo la lettera del file
+                        ntrack_id.append(ntrack_id_letter)
+                        ntrack_id_letter += 1
 
-                    inizio.append(df[df.columns[1]][i + i * sep].time()) 
-                    fine.append(df[df.columns[1]][(i+1)*sep].time())
-                    
-                    # Durata
-                    dT = df[df.columns[1]][(i+1)*sep] - df[df.columns[1]][i + i * sep]
-                    dT_str = f"{dT.components[1]:02d}:{dT.components[2]:02d}:{dT.components[3]:02d}"
-                    durata.append(dT_str)
+                        inizio.append(df[df.columns[1]][i + i * sep].time()) 
+                        fine.append(df[df.columns[1]][(i+1)*sep].time())
+                        
+                        # Durata
+                        dT = df[df.columns[1]][(i+1)*sep] - df[df.columns[1]][i + i * sep]
+                        dT_str = f"{dT.components[1]:02d}:{dT.components[2]:02d}:{dT.components[3]:02d}"
+                        durata.append(dT_str)
 
 
-                    #LeqA
-                    LeqA_min.append(round(min(df[df.columns[2]][0+i*int(sep):(i+1)*int(sep)]),decimals))
-                    LeqA_max.append(round(max(df[df.columns[2]][0+i*int(sep):(i+1)*int(sep)]),decimals))
-                    LeqA_eq.append(round(10*log10(sum(10**(df[df.columns[2]][0+i*int(sep):(i+1)*int(sep)]/10))/(len(df[df.columns[2]][0+i*int(sep):(i+1)*int(sep)])) ),decimals))
-                    # print(len(df['LAeq'][0+i*int(sep):(i+1)*int(sep)]))
-                    
+                        #LeqA
+                        LeqA_min.append(round(min(df[df.columns[2]][0+i*int(sep):(i+1)*int(sep)]),decimals))
+                        LeqA_max.append(round(max(df[df.columns[2]][0+i*int(sep):(i+1)*int(sep)]),decimals))
+                        LeqA_eq.append(round(10*log10(sum(10**(df[df.columns[2]][0+i*int(sep):(i+1)*int(sep)]/10))/(len(df[df.columns[2]][0+i*int(sep):(i+1)*int(sep)])) ),decimals))
+                        # print(len(df['LAeq'][0+i*int(sep):(i+1)*int(sep)]))
+                        
 
-                    #LeqC
-                    LeqC_min.append(round(min(df[df.columns[4]][0+i*int(sep):(i+1)*int(sep)]),decimals))
-                    LeqC_max.append(round(max(df[df.columns[4]][0+i*int(sep):(i+1)*int(sep)]),decimals))
-                    LeqC_eq.append(round( 10*log10(sum(10**(df[df.columns[4]][0+i*int(sep):(i+1)*int(sep)]/10))/(len(df[df.columns[4]][0+i*int(sep):(i+1)*int(sep)])) ),decimals))
+                        #LeqC
+                        LeqC_min.append(round(min(df[df.columns[4]][0+i*int(sep):(i+1)*int(sep)]),decimals))
+                        LeqC_max.append(round(max(df[df.columns[4]][0+i*int(sep):(i+1)*int(sep)]),decimals))
+                        LeqC_eq.append(round( 10*log10(sum(10**(df[df.columns[4]][0+i*int(sep):(i+1)*int(sep)]/10))/(len(df[df.columns[4]][0+i*int(sep):(i+1)*int(sep)])) ),decimals))
 
-                    PeakC_max.append(round(max(df[df.columns[3]][0+i*int(sep):(i+1)*int(sep)]),decimals))
-                    PeakC_eq.append(round(average(df[df.columns[3]][0+i*int(sep):(i+1)*int(sep)]),decimals))
+                        PeakC_max.append(round(max(df[df.columns[3]][0+i*int(sep):(i+1)*int(sep)]),decimals))
+                        PeakC_eq.append(round(average(df[df.columns[3]][0+i*int(sep):(i+1)*int(sep)]),decimals))
 
-                    #LAeqS and LAeqI
-                    LASeq_T.append(round(10*log10(sum(10**(df[df.columns[5]][0+i*int(sep):(i+1)*int(sep)]/10))/(len(df[df.columns[5]][0+i*int(sep):(i+1)*int(sep)]))),decimals))
-
+                        #LAeqS and LAeqI
+                        LASeq_T.append(round(10*log10(sum(10**(df[df.columns[5]][0+i*int(sep):(i+1)*int(sep)]/10))/(len(df[df.columns[5]][0+i*int(sep):(i+1)*int(sep)]))),decimals))
+                except Exception as e:
+                    print(f"Errore durante l'elaborazione del file {file}: {e}")
+                    continue  # Salta al prossimo file
                 letter_id_number += 1
             
             df_tot['fileID'] = fileIDs
