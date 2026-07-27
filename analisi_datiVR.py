@@ -1588,7 +1588,7 @@ class analisi:
                                        'U':U_sdom,
                                        'LeqA' : LeqA_mean, 
                                        'LeqC' : LeqC_mean ,
-                                       'Ppeak' : Ppeak_mean})
+                                       'Ppeak' : Ppeak_mean}, dtype={'jobName': str, 'ID': str, 'U': float, 'LeqA': float, 'LeqC': float, 'Ppeak': float})
                 df_avg = pd.concat([df_avg,new_df], ignore_index=True)
             
             
@@ -1596,6 +1596,7 @@ class analisi:
             df_avg['GrOm'] = [[]] * len(df_avg) #creo la colonna con gli ID del gruppo omogeneo
             # df_avg['DPI'] = [[]] * len(df_avg) #creo la colonna contenente il riferimento all'uso del DPI
 
+            
 
             files.write_csv(df_avg, self.main_dir + '/averaged_data.csv')
             files.write_exel(df_avg, self.main_dir + '/averaged_data.xlsx')
@@ -1604,7 +1605,7 @@ class analisi:
             return df_avg
         else:
             print('File averaged.csv already exists!')
-            df_avg = pd.read_csv(self.main_dir + '/averaged_data.csv')
+            df_avg = pd.read_csv(self.main_dir + '/averaged_data.csv', dtype={'jobName': str, 'ID': str, 'U': float, 'LeqA': float, 'LeqC': float, 'Ppeak': float})
             return df_avg
 
     
@@ -1654,7 +1655,11 @@ class analisi:
         # ==================================================================
         # STEP 1 — Lettura foglio 'Scheda_mansioni' come dataframe
         # ==================================================================
-        df_scheda_gruppi_dpi = pd.read_excel(excel_info_dir + "/" + name_exel_info, sheet_name=sheet_mansioni, header=1)
+        df_scheda_gruppi_dpi = pd.read_excel(excel_info_dir + "/" + name_exel_info, 
+                                             sheet_name=sheet_mansioni, 
+                                             header=1,
+                                             dtype={"ID_GrOm": str, "Descrizione_GrOm": str, "ID_reparto": str, "Descrizione_reparto": str, "Descrizione_compito": str,"ID_misura": str, "Ti":int, })
+
 
         df_scheda_gruppi_dpi = df_scheda_gruppi_dpi.merge(
             df_avg[['ID', 'U', 'LeqA', 'LeqC', 'Ppeak']],
