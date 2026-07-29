@@ -41,7 +41,7 @@ def main(main_directory):
     Puoi anche selezionare direttamente questa parte per continuare se hai interrotto il codice.\n
     §§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§§
     '''
-    input(str_print_4input)
+    # input(str_print_4input)
 
     
     

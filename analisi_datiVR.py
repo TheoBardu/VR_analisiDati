@@ -738,6 +738,82 @@ class exel_file:
         wb.save(path)
         print(f"Bordi applicati nel file: {path}")
 
+    def formatta_dimensioni_celle(file_path: str, output_path: str = None, larghezza_colonna_V: float = 43) -> str:
+        """
+        Adatta automaticamente la larghezza delle colonne al contenuto in tutti i fogli
+        del file Excel (stesso effetto del doppio click sul bordo di una colonna in
+        Excel), foglio per foglio: ogni foglio ('Scheda N', 'Riepilogo', ecc.) viene
+        dimensionato in base al proprio contenuto, colonna per colonna, incluse le
+        colonne dalla P in poi (blocchi "VALUTAZIONE SU BASE GIORNALIERA" e "Analisi DPI
+        in dotazione"), che risultano quindi strette dato che contengono per lo più
+        numeri ed etichette brevi.
+
+        Le celle che fanno parte di un'unione (es. i titoli "VALUTAZIONE SU BASE
+        GIORNALIERA" e "Analisi DPI in dotazione", che occupano molte colonne) vengono
+        escluse dal calcolo, esattamente come fa Excel quando si fa doppio click sul
+        bordo di una colonna: il loro contenuto non deve gonfiare la larghezza di una
+        singola colonna sottostante.
+
+        Nei fogli 'Scheda N' vengono inoltre normalizzate le altezze delle righe 2-6
+        (blocco valutazione), così da avere lo stesso aspetto su tutte le schede, e la
+        larghezza della colonna V viene forzata al valore fisso `larghezza_colonna_V`
+        (etichetta "Massimo dei Lpicco,C misurati =" in font grande, per cui l'autofit
+        calcolato sul solo numero di caratteri risulta impreciso).
+
+        Args:
+            file_path:            Percorso del file Excel di input.
+            output_path:          Percorso di output (opzionale). Se None, sovrascrive il file originale.
+            larghezza_colonna_V:  Larghezza fissa da applicare alla colonna V dei fogli
+                                  'Scheda N' (default: 43).
+
+        Returns:
+            Percorso del file salvato.
+        """
+        import shutil
+        from openpyxl import load_workbook
+        from openpyxl.utils import get_column_letter
+        from builtins import max as builtin_max
+
+        if not path.isfile(file_path):
+            raise FileNotFoundError(f"File non trovato: {file_path}")
+
+        if output_path is None:
+            output_path = file_path
+        elif output_path != file_path:
+            shutil.copy2(file_path, output_path)
+
+        wb = load_workbook(output_path)
+
+        ALTEZZE_RIGHE_VALUTAZIONE = {2: 19, 3: 28, 4: 19, 5: 16, 6: 16}
+
+        for ws in wb.worksheets:
+            celle_unite = set()
+            for merged_range in ws.merged_cells.ranges:
+                for riga in range(merged_range.min_row, merged_range.max_row + 1):
+                    for colonna in range(merged_range.min_col, merged_range.max_col + 1):
+                        celle_unite.add((riga, colonna))
+
+            larghezza_contenuto: dict[int, int] = {}
+            for row in ws.iter_rows():
+                for cell in row:
+                    if cell.value is not None and (cell.row, cell.column) not in celle_unite:
+                        larghezza_contenuto[cell.column] = builtin_max(
+                            larghezza_contenuto.get(cell.column, 0),
+                            len(str(cell.value))
+                        )
+
+            for col_idx, lunghezza in larghezza_contenuto.items():
+                col_letter = get_column_letter(col_idx)
+                ws.column_dimensions[col_letter].width = builtin_max(lunghezza + 2, 8)
+
+            if ws.title.strip().lower().startswith('scheda'):
+                for riga, altezza in ALTEZZE_RIGHE_VALUTAZIONE.items():
+                    ws.row_dimensions[riga].height = altezza
+                ws.column_dimensions['V'].width = larghezza_colonna_V
+
+        wb.save(output_path)
+        print(f"Dimensioni celle adattate al contenuto in: {output_path}")
+        return output_path
 
 
 class files:
@@ -2341,6 +2417,9 @@ class analisi:
 
         # Ri-applico i bordi per includere anche le sezioni DPI appena scritte
         exel_file.colora_bordi_celle(excel_aggiornato)
+
+        # Uniformo le dimensioni delle celle (colonne P in poi come da Scheda di riferimento)
+        exel_file.formatta_dimensioni_celle(excel_aggiornato)
 
         print('\nApplicazione DPI HML completata.')
 
