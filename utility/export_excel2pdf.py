@@ -147,7 +147,7 @@ def imposta_aree_di_stampa(excel_document):
         ws.print_area = area
         aree[ws.title] = area
 
-        _adatta_larghezze(ws)
+        # _adatta_larghezze(ws)
 
         # Impaginazione: A4 orizzontale, adattato alla larghezza
         ws.page_setup.orientation = ORIENTAMENTO

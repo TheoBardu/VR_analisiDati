@@ -738,7 +738,7 @@ class exel_file:
         wb.save(path)
         print(f"Bordi applicati nel file: {path}")
 
-    def formatta_dimensioni_celle(file_path: str, output_path: str = None, larghezza_colonna_V: float = 43) -> str:
+    def formatta_dimensioni_celle(file_path: str, output_path: str = None, larghezza_colonna_V: float = 6) -> str:
         """
         Adatta automaticamente la larghezza delle colonne al contenuto in tutti i fogli
         del file Excel (stesso effetto del doppio click sul bordo di una colonna in
@@ -807,10 +807,12 @@ class exel_file:
                 ws.column_dimensions[col_letter].width = builtin_max(lunghezza + 2, 8)
 
             if ws.title.strip().lower().startswith('scheda'):
-                for riga, altezza in ALTEZZE_RIGHE_VALUTAZIONE.items():
-                    ws.row_dimensions[riga].height = altezza
+                # for riga, altezza in ALTEZZE_RIGHE_VALUTAZIONE.items():
+                #     ws.row_dimensions[riga].height = altezza
                 ws.column_dimensions['V'].width = larghezza_colonna_V
 
+            
+        
         wb.save(output_path)
         print(f"Dimensioni celle adattate al contenuto in: {output_path}")
         return output_path
@@ -1664,7 +1666,8 @@ class analisi:
                                        'U':U_sdom,
                                        'LeqA' : LeqA_mean, 
                                        'LeqC' : LeqC_mean ,
-                                       'Ppeak' : Ppeak_mean}, dtype={'jobName': str, 'ID': str, 'U': float, 'LeqA': float, 'LeqC': float, 'Ppeak': float})
+                                       'Ppeak' : Ppeak_mean})
+                
                 df_avg = pd.concat([df_avg,new_df], ignore_index=True)
             
             
@@ -2406,13 +2409,6 @@ class analisi:
                 print(f"  → Sezione DPI scritta nel foglio '{sn}' "
                         f"(riga titolo: {riga_titolo}).")
                 
-
-
-
-
-
-        
-
                 
 
         # Ri-applico i bordi per includere anche le sezioni DPI appena scritte
