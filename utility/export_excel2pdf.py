@@ -111,12 +111,17 @@ def _adatta_larghezze(ws):
 # Area di stampa
 # ---------------------------------------------------------------------------
 
-def imposta_aree_di_stampa(excel_document):
+def imposta_aree_di_stampa(excel_document, colonna_stampa: str = 'Q'):
     """
-    Imposta su ogni foglio l'area di stampa pari al rettangolo di celle popolate
-    (A1 -> ultima riga/colonna con contenuto), adatta le larghezze delle colonne
-    al contenuto e imposta l'impaginazione: A4, orizzontale, adattato alla
-    larghezza della pagina.
+    Imposta l'area di stampa e l'impaginazione (A4, orizzontale, adattato alla
+    larghezza della pagina) di ogni foglio.
+
+    Sui fogli 'Scheda N' l'area di stampa copre tutte le righe del foglio, dalla
+    colonna A alla colonna `colonna_stampa` (default 'Q'), indipendentemente da
+    dove finisce il contenuto — la struttura a blocchi impilati di questi fogli
+    (intestazione/valutazione/DPI/misure) rende l'ultima colonna "popolata" un
+    indicatore fuorviante dell'area da stampare. Gli altri fogli (es. 'Riepilogo')
+    mantengono l'area di stampa adattata al rettangolo di celle popolate.
 
     Sui fogli 'Scheda N' la riga di intestazione viene ripetuta su ogni pagina.
     Il file viene salvato in place.
@@ -125,6 +130,8 @@ def imposta_aree_di_stampa(excel_document):
     ----------
     excel_document : str
         Percorso del file .xlsx da preparare
+    colonna_stampa : str
+        Colonna finale dell'area di stampa per i fogli 'Scheda N' (default 'Q')
 
     Ritorna
     -------
@@ -138,12 +145,16 @@ def imposta_aree_di_stampa(excel_document):
             print(f"  '{ws.title}': foglio vuoto, saltato")
             continue
 
-        max_row = _ultima_riga_popolata(ws)
-        max_col = _ultima_col_popolata(ws)
-        if max_row == 0 or max_col == 0:
-            continue
+        e_scheda = ws.title.strip().lower().startswith('scheda')
+        if e_scheda:
+            area = f"A1:{colonna_stampa}{ws.max_row}"
+        else:
+            max_row = _ultima_riga_popolata(ws)
+            max_col = _ultima_col_popolata(ws)
+            if max_row == 0 or max_col == 0:
+                continue
+            area = f"A1:{get_column_letter(max_col)}{max_row}"
 
-        area = f"A1:{get_column_letter(max_col)}{max_row}"
         ws.print_area = area
         aree[ws.title] = area
 
@@ -163,7 +174,7 @@ def imposta_aree_di_stampa(excel_document):
         ws.page_margins.bottom = MARGINI
 
         # Ripeti l'intestazione della tabella su ogni pagina
-        if ws.title.strip().lower().startswith('scheda'):
+        if e_scheda:
             ws.print_title_rows = '1:1'
 
         print(f"  '{ws.title}': area di stampa {area}")
@@ -219,7 +230,7 @@ def _export_libreoffice(excel_document, pdf_output):
 # Funzione principale
 # ---------------------------------------------------------------------------
 
-def esporta_pdf(excel_document, pdf_output=None):
+def esporta_pdf(excel_document, pdf_output=None, colonna_stampa: str = 'Q'):
     """
     Imposta le aree di stampa ed esporta tutti i fogli dell'excel in un unico PDF.
 
@@ -230,6 +241,9 @@ def esporta_pdf(excel_document, pdf_output=None):
     pdf_output : str, opzionale
         Percorso del PDF di destinazione. Se None viene usato lo stesso
         percorso/nome del sorgente con estensione .pdf
+    colonna_stampa : str
+        Colonna finale dell'area di stampa per i fogli 'Scheda N' (default 'Q'),
+        vedi imposta_aree_di_stampa()
 
     Ritorna
     -------
@@ -245,7 +259,7 @@ def esporta_pdf(excel_document, pdf_output=None):
     pdf_output = os.path.abspath(os.path.expanduser(pdf_output))
 
     print(f"Impostazione aree di stampa in {os.path.basename(excel_document)}...")
-    imposta_aree_di_stampa(excel_document)
+    imposta_aree_di_stampa(excel_document, colonna_stampa=colonna_stampa)
 
     print("Export PDF con LibreOffice...")
     _export_libreoffice(excel_document, pdf_output)

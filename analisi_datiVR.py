@@ -220,26 +220,37 @@ class exel_file:
 
     def inserisci_valutazione_schede( path_riepilogo: str, path_totale: str, path_output: str,):
         """
-        inserisci_valutazione_rumore.py
+        Legge i dati di valutazione da VR8h_riepilogo.xlsx e l'anagrafica GrOm/reparto
+        dalle schede di VR8h_totale.xlsx, e scrive in path_output (un file NUOVO, non
+        una copia modificata di path_totale) per ogni foglio "Scheda N":
+        - righe RIGA_INIZIO_INTESTAZIONE_GROM..+3, colonne
+          COL_ETICHETTA_INTESTAZIONE_GROM/COL_VALORE_INTESTAZIONE_GROM: blocco
+          intestazione ID_GrOm/Descrizione_GrOm/ID_reparto/Descrizione_reparto
+          (etichetta/valore), scritto una sola volta per scheda.
+        - righe RIGA_INIZIO_VALUTAZIONE..+4, colonne COL_INIZIO_VALUTAZIONE..+7:
+          tabellina "VALUTAZIONE SU BASE GIORNALIERA".
 
-        Funzione che legge i dati dal file VR8h_riepilogo.xlsx e li inserisce
-        nelle schede del file VR8h_totale.xlsx, aggiungendo la tabellina di
-        valutazione a destra (colonne M:T, righe 2-6) di ogni foglio "Scheda N".
+        La tabella delle misure non viene scritta qui: la sua riga di partenza
+        dipende dal numero di DPI (variabile), noto solo dentro applica_DPI_HML,
+        che la scrive tramite inserisci_tabella_misure() dopo il blocco DPI.
 
-        Layout della tabellina inserita:
-        Riga 2 (M2:T2 merged): "VALUTAZIONE SU BASE GIORNALIERA"  (header)
-        Riga 3: LEX,8h | N3=Lex8h | ± | P3=U | → |   | LEX MAX = | T3=Lex_max
-        Riga 4:                                             Massimo dei Lpicco,C = | T4=L_picco_C
-        Righe 5-6 (M5:T6 merged): "CLASSE RISCHIO <classe_rischio>"  (colorato)
+        Layout della tabellina valutazione (colonne relative a COL_INIZIO_VALUTAZIONE,
+        M=+0, N=+1, O=+2, P=+3, Q=+4, R=+5, S=+OFFSET_ETICHETTA_VALUTAZIONE, T=S+1):
+        Riga 0 (M:T merged): "VALUTAZIONE SU BASE GIORNALIERA"  (header)
+        Riga 1: LEX,8h | N=Lex8h | ± | P=U | → |   | LEX MAX = | T=Lex_max
+        Riga 2:                                     Massimo dei Lpicco,C = | T=L_picco_C
+        Righe 3-4 (M:T merged): "CLASSE RISCHIO <classe_rischio>"  (colorato)
         """
 
-        import copy
         import openpyxl
         from openpyxl.styles import (
             Font, PatternFill, Alignment, Border, Side
         )
         from openpyxl.styles.colors import Color
         from openpyxl.utils import get_column_letter
+        from config import (RIGA_INIZIO_INTESTAZIONE_GROM, COL_ETICHETTA_INTESTAZIONE_GROM,
+                            COL_VALORE_INTESTAZIONE_GROM, RIGA_INIZIO_VALUTAZIONE,
+                            COL_INIZIO_VALUTAZIONE, OFFSET_ETICHETTA_VALUTAZIONE)
 
 
         # ---------------------------------------------------------------------------
@@ -296,249 +307,237 @@ class exel_file:
                 ws.merge_cells(start_row=min_row, start_column=min_col,
                             end_row=max_row,   end_column=max_col)
 
-        def _last_populated_col(ws) -> int:
-            """Restituisce l'indice (1-based) dell'ultima colonna con almeno un valore."""
-            max_col = 0
-            for row in ws.iter_rows():
-                for cell in row:
-                    if cell.value is not None and cell.column > max_col:
-                        max_col = cell.column
-            return max_col if max_col > 0 else 1
+        # ---------------------------------------------------------------------------
+        # 1. Leggi il riepilogo
+        # ---------------------------------------------------------------------------
+        wb_riepilogo = openpyxl.load_workbook(path_riepilogo, data_only=True)
+        sh_riepilogo = wb_riepilogo.active
+
+        # Costruiamo un dict: ID_GrOm -> {Lex8h, U, Lex_max, L_picco_C, classe_rischio}
+        headers = [cell.value for cell in sh_riepilogo[1]]
+        col_idx = {h: i for i, h in enumerate(headers)}
+
+        riepilogo = {}
+        for row in sh_riepilogo.iter_rows(min_row=2, values_only=True):
+            id_grom = str(row[col_idx["ID_GrOm"]])
+            riepilogo[id_grom] = {
+                "Lex8h":         row[col_idx["Lex8h"]],
+                "U":             row[col_idx["U"]],
+                "Lex_max":       row[col_idx["Lex_max"]],
+                "L_picco_C":     row[col_idx["L_picco_C"]],
+                "classe_rischio": row[col_idx["classe_rischio"]],
+            }
 
         # ---------------------------------------------------------------------------
-        # Funzione principale
+        # 2. Apri VR8h_totale: serve solo per leggere l'anagrafica GrOm/reparto
+        #    (riga 2, colonne A-D) di ogni scheda — non viene modificato.
         # ---------------------------------------------------------------------------
-        def inserisci_valutazione(
-            path_riepilogo: str,
-            path_totale: str,
-            path_output: str,
-        ):
-            """
-            Legge i dati da `path_riepilogo` e li inserisce nelle schede di
-            `path_totale`, salvando il risultato in `path_output`.
+        wb_totale = openpyxl.load_workbook(path_totale)
 
-            Parametri
-            ----------
-            path_riepilogo : str
-                Percorso di VR8h_riepilogo.xlsx
-            path_totale : str
-                Percorso di VR8h_totale.xlsx (file sorgente, non viene modificato)
-            path_output : str
-                Percorso del file Excel di output
-            """
+        # ---------------------------------------------------------------------------
+        # 3. Costruisci path_output da zero: ogni "Scheda N" riparte pulita, senza
+        #    ereditare la vecchia tabella piatta né le sue colonne/fill.
+        # ---------------------------------------------------------------------------
+        wb_out = openpyxl.Workbook()
+        foglio_default = wb_out.sheetnames[0]
+        schede_scritte = 0
+
+        col0  = COL_INIZIO_VALUTAZIONE
+        M, N, O, P, Q, R = col0, col0 + 1, col0 + 2, col0 + 3, col0 + 4, col0 + 5
+        S = col0 + OFFSET_ETICHETTA_VALUTAZIONE
+        T = S + 1
+        riga0 = RIGA_INIZIO_VALUTAZIONE
+        fill_bianco = _fill("FFFFFFFF")   # sfondo bianco (indexed 9)
+
+        for shname in wb_totale.sheetnames:
+            if not shname.strip().lower().startswith("scheda"):
+                continue
+
+            ws_tot = wb_totale[shname]
+
+            # Anagrafica GrOm/reparto: costante su tutte le righe della scheda,
+            # la leggo dalla prima riga di dati (riga 2, colonne A-D).
+            id_grom             = str(ws_tot.cell(2, 1).value)
+            descrizione_grom    = ws_tot.cell(2, 2).value
+            id_reparto          = ws_tot.cell(2, 3).value
+            descrizione_reparto = ws_tot.cell(2, 4).value
+
+            if id_grom not in riepilogo:
+                print(f"  [AVVISO] '{shname}': ID '{id_grom}' non trovato nel riepilogo. Skip.")
+                continue
+
+            dati = riepilogo[id_grom]
+            lex8h        = dati["Lex8h"]
+            u            = dati["U"]
+            lex_max      = dati["Lex_max"]
+            l_picco_c    = dati["L_picco_C"]
+            classe       = (dati["classe_rischio"] or "").strip().upper()
+
+            # Palette colore per la classe
+            palette = CLASSE_FILL.get(classe, {"bg": "FFD3D3D3", "font_color": "FF000000"})
+            fill_classe = _fill(palette["bg"])
+            font_classe_color = palette["font_color"]
+
+            ws = wb_out.create_sheet(shname)
+            schede_scritte += 1
 
             # ------------------------------------------------------------------
-            # 1. Leggi il riepilogo
+            # Blocco intestazione GrOm/reparto (etichetta in colonna A, valore in B)
             # ------------------------------------------------------------------
-            wb_riepilogo = openpyxl.load_workbook(path_riepilogo, data_only=True)
-            sh_riepilogo = wb_riepilogo.active
-
-            # Costruiamo un dict: ID_GrOm -> {Lex8h, U, Lex_max, L_picco_C, classe_rischio}
-            headers = [cell.value for cell in sh_riepilogo[1]]
-            col_idx = {h: i for i, h in enumerate(headers)}
-
-            riepilogo = {}
-            for row in sh_riepilogo.iter_rows(min_row=2, values_only=True):
-                id_grom = str(row[col_idx["ID_GrOm"]])
-                riepilogo[id_grom] = {
-                    "Lex8h":         row[col_idx["Lex8h"]],
-                    "U":             row[col_idx["U"]],
-                    "Lex_max":       row[col_idx["Lex_max"]],
-                    "L_picco_C":     row[col_idx["L_picco_C"]],
-                    "classe_rischio": row[col_idx["classe_rischio"]],
-                }
+            riga_h = RIGA_INIZIO_INTESTAZIONE_GROM
+            for i, (etichetta, valore) in enumerate([
+                ("ID_GrOm", id_grom),
+                ("Descrizione_GrOm", descrizione_grom),
+                ("ID_reparto", id_reparto),
+                ("Descrizione_reparto", descrizione_reparto),
+            ]):
+                _set(ws, riga_h + i, COL_ETICHETTA_INTESTAZIONE_GROM,
+                     value=etichetta, font=_font(bold=True))
+                _set(ws, riga_h + i, COL_VALORE_INTESTAZIONE_GROM,
+                     value=valore, font=_font(bold=False))
+            # Nessun bordo qui: colora_bordi_celle applica il perimetro esterno.
 
             # ------------------------------------------------------------------
-            # 2. Apri VR8h_totale e lavora su ogni scheda
+            # Riga 0 del blocco valutazione: header "VALUTAZIONE SU BASE GIORNALIERA"
             # ------------------------------------------------------------------
-            wb = openpyxl.load_workbook(path_totale)
+            _safe_merge(ws, riga0, M, riga0, T)
+            _set(ws, riga0, M,
+                value="VALUTAZIONE SU BASE GIORNALIERA",
+                font=_font(bold=True, size=14),
+                fill=_fill("FFCCFFCC"),          # indexed 42 -> light green
+                alignment=_align("center"),
+                border=_border(left=BORDER_MEDIUM, right=BORDER_MEDIUM,
+                                top=BORDER_MEDIUM, bottom=BORDER_MEDIUM))
+            # Celle N:T (parte del merge) — solo bordi top/bottom per il contorno esterno
+            for c in range(N, T + 1):
+                _set(ws, riga0, c,
+                    border=_border(top=BORDER_MEDIUM, bottom=BORDER_MEDIUM,
+                                    right=BORDER_MEDIUM if c == T else BORDER_NONE))
 
-            for shname in wb.sheetnames:
-                if not shname.startswith("Scheda"):
-                    continue
+            # ------------------------------------------------------------------
+            # Riga 1: LEX,8h | Lex8h | ± | U | → |   | LEX MAX = | Lex_max
+            # ------------------------------------------------------------------
+            _set(ws, riga0 + 1, M,
+                value="LEX,8h",
+                font=_font(bold=True, size=14),
+                fill=fill_bianco,
+                alignment=_align("center"),
+                border=_border(left=BORDER_MEDIUM))
 
-                ws = wb[shname]
+            _set(ws, riga0 + 1, N,
+                value=lex8h,
+                font=_font(bold=True, size=14),
+                fill=fill_bianco,
+                alignment=_align("right"))
 
-                # Recupera l'ID dal primo dato (riga 2, colonna A)
-                id_grom = str(ws.cell(2, 1).value)
-                if id_grom not in riepilogo:
-                    print(f"  [AVVISO] '{shname}': ID '{id_grom}' non trovato nel riepilogo. Skip.")
-                    continue
+            _set(ws, riga0 + 1, O,
+                value="±",
+                font=_font(bold=True, size=14),
+                fill=fill_bianco,
+                alignment=_align("center"))
 
-                dati = riepilogo[id_grom]
-                lex8h        = dati["Lex8h"]
-                u            = dati["U"]
-                lex_max      = dati["Lex_max"]
-                l_picco_c    = dati["L_picco_C"]
-                classe       = (dati["classe_rischio"] or "").strip().upper()
+            _set(ws, riga0 + 1, P,
+                value=u,
+                font=_font(bold=True, size=14),
+                fill=fill_bianco,
+                alignment=_align("left"))
 
-                # Palette colore per la classe
-                palette = CLASSE_FILL.get(classe, {"bg": "FFD3D3D3", "font_color": "FF000000"})
-                fill_classe = _fill(palette["bg"])
-                font_classe_color = palette["font_color"]
+            _set(ws, riga0 + 1, Q,
+                value="→",
+                font=_font(bold=False, size=22),
+                fill=fill_bianco,
+                alignment=_align("right"))
 
-                # ------------------------------------------------------------------
-                # Calcola colonna di partenza: ultima col popolata + 3
-                # ------------------------------------------------------------------
-                # MODIFICA: le 8 colonne della tabellina non sono più hardcodate a
-                # M..T (13..20) ma calcolate dinamicamente in base al contenuto del
-                # foglio. col_start = max_col_popolata + 3; col_end = col_start + 7.
-                last_col  = _last_populated_col(ws)
-                col_start = last_col + 3          # prima colonna della tabellina
-                M = col_start
-                N = col_start + 1   # Lex8h
-                O = col_start + 2   # ±
-                P = col_start + 3   # U
-                Q = col_start + 4   # →
-                R = col_start + 5   # (vuota)
-                S = col_start + 6   # "LEX MAX =" / "Massimo dei Lpicco,C..."
-                T = col_start + 7   # valore numerico (col_end)
+            _set(ws, riga0 + 1, R,
+                value=None,
+                font=_font(size=22),
+                fill=fill_bianco,
+                alignment=_align("left"))
 
-                # ------------------------------------------------------------------
-                # Riga 2: header "VALUTAZIONE SU BASE GIORNALIERA" (merge col_start:col_end)
-                # ------------------------------------------------------------------
-                # MODIFICA: la pulizia dei merge esistenti usa col_start/T calcolati
-                for mr in list(ws.merged_cells.ranges):
-                    if mr.min_col >= M and mr.max_col <= T and 2 <= mr.min_row <= 6:
-                        ws.merged_cells.remove(mr)
+            _set(ws, riga0 + 1, S,
+                value="LEX MAX =",
+                font=_font(bold=True, size=14),
+                fill=fill_bianco,
+                alignment=_align("right"))
 
-                _safe_merge(ws, 2, M, 2, T)
-                _set(ws, 2, M,
-                    value="VALUTAZIONE SU BASE GIORNALIERA",
-                    font=_font(bold=True, size=14),
-                    fill=_fill("FFCCFFCC"),          # indexed 42 -> light green
-                    alignment=_align("center"),
-                    border=_border(left=BORDER_MEDIUM, right=BORDER_MEDIUM,
-                                    top=BORDER_MEDIUM, bottom=BORDER_MEDIUM))
-                # Celle N2:T2 (parte del merge) — solo bordi top/bottom per il contorno esterno
-                for c in range(N, T + 1):
-                    _set(ws, 2, c,
-                        border=_border(top=BORDER_MEDIUM, bottom=BORDER_MEDIUM,
-                                        right=BORDER_MEDIUM if c == T else BORDER_NONE))
+            _set(ws, riga0 + 1, T,
+                value=lex_max,
+                font=_font(bold=True, size=14),
+                fill=fill_bianco,
+                alignment=_align("center"),
+                border=_border(right=BORDER_MEDIUM))
 
-                # ------------------------------------------------------------------
-                # Riga 3: LEX,8h | Lex8h | ± | U | → |   | LEX MAX = | Lex_max
-                # ------------------------------------------------------------------
-                fill_bianco = _fill("FFFFFFFF")   # sfondo bianco (indexed 9)
-
-                _set(ws, 3, M,
-                    value="LEX,8h",
-                    font=_font(bold=True, size=14),
-                    fill=fill_bianco,
-                    alignment=_align("center"),
-                    border=_border(left=BORDER_MEDIUM))
-
-                _set(ws, 3, N,
-                    value=lex8h,
-                    font=_font(bold=True, size=14),
-                    fill=fill_bianco,
-                    alignment=_align("right"))
-
-                _set(ws, 3, O,
-                    value="±",
-                    font=_font(bold=True, size=14),
-                    fill=fill_bianco,
-                    alignment=_align("center"))
-
-                _set(ws, 3, P,
-                    value=u,
-                    font=_font(bold=True, size=14),
-                    fill=fill_bianco,
-                    alignment=_align("left"))
-
-                _set(ws, 3, Q,
-                    value="→",
-                    font=_font(bold=False, size=22),
-                    fill=fill_bianco,
-                    alignment=_align("right"))
-
-                _set(ws, 3, R,
+            # ------------------------------------------------------------------
+            # Riga 2: (vuota a sinistra) | Massimo dei Lpicco,C misurati = | L_picco_C
+            # ------------------------------------------------------------------
+            for c in range(M, S):
+                _set(ws, riga0 + 2, c,
                     value=None,
-                    font=_font(size=22),
                     fill=fill_bianco,
-                    alignment=_align("left"))
+                    font=_font(size=14),
+                    border=_border(left=BORDER_MEDIUM if c == M else BORDER_NONE))
 
-                _set(ws, 3, S,
-                    value="LEX MAX =",
-                    font=_font(bold=True, size=14),
-                    fill=fill_bianco,
-                    alignment=_align("right"))
+            _set(ws, riga0 + 2, S,
+                value="Massimo dei Lpicco,C misurati =",
+                font=_font(bold=True, size=14),
+                fill=fill_bianco,
+                alignment=_align("right"))
 
-                _set(ws, 3, T,
-                    value=lex_max,
-                    font=_font(bold=True, size=14),
-                    fill=fill_bianco,
-                    alignment=_align("center"),
-                    border=_border(right=BORDER_MEDIUM))
-
-                # ------------------------------------------------------------------
-                # Riga 4: (vuota a sinistra) | Massimo dei Lpicco,C misurati = | L_picco_C
-                # ------------------------------------------------------------------
-                for c in range(M, S):
-                    _set(ws, 4, c,
-                        value=None,
-                        fill=fill_bianco,
-                        font=_font(size=14),
-                        border=_border(left=BORDER_MEDIUM if c == M else BORDER_NONE))
-
-                _set(ws, 4, S,
-                    value="Massimo dei Lpicco,C misurati =",
-                    font=_font(bold=True, size=14),
-                    fill=fill_bianco,
-                    alignment=_align("right"))
-
-                _set(ws, 4, T,
-                    value=l_picco_c,
-                    font=_font(bold=True, size=14),
-                    fill=fill_bianco,
-                    alignment=_align("center"),
-                    border=_border(right=BORDER_MEDIUM))
-
-                # ------------------------------------------------------------------
-                # Righe 5-6: CLASSE RISCHIO (M5:T6 merged, colorato)
-                # ------------------------------------------------------------------
-                _safe_merge(ws, 5, M, 6, T)
-                _set(ws, 5, M,
-                    value=f"CLASSE RISCHIO {classe}",
-                    font=_font(bold=True, size=14, color=font_classe_color),
-                    fill=fill_classe,
-                    alignment=_align("center", "center"),
-                    border=_border(left=BORDER_MEDIUM, right=BORDER_MEDIUM,
-                                    top=BORDER_MEDIUM, bottom=BORDER_MEDIUM))
-
-                # Celle della seconda riga del merge (row 6) — bordi del contorno
-                for c in range(N, T + 1):
-                    _set(ws, 6, c,
-                        border=_border(bottom=BORDER_MEDIUM,
-                                        right=BORDER_MEDIUM if c == T else BORDER_NONE))
-
-                # ------------------------------------------------------------------
-                # Larghezze colonne M:T (se non già impostate)
-                # ------------------------------------------------------------------
-                col_widths = {M: 6, N: 7, O: 4, P: 6, Q: 4, R: 4, S: 28, T: 10}
-                for col_num, width in col_widths.items():
-                    col_letter = get_column_letter(col_num)
-                    cd = ws.column_dimensions[col_letter]
-                    if cd.width is None or cd.width < 1:
-                        cd.width = width
-
-                # Altezze righe (solo se non impostate)
-                row_heights = {2: 19, 3: 28, 4: 19, 5: 16, 6: 16}
-                for r, h in row_heights.items():
-                    rd = ws.row_dimensions[r]
-                    if rd.height is None or rd.height < 1:
-                        rd.height = h
-
-                print(f"  [OK] '{shname}': col_start={get_column_letter(M)} (last_col={get_column_letter(last_col)}+3), "
-                    f"classe={classe}, Lex8h={lex8h}, U={u}, Lex_max={lex_max}, L_picco_C={l_picco_c}")
+            _set(ws, riga0 + 2, T,
+                value=l_picco_c,
+                font=_font(bold=True, size=14),
+                fill=fill_bianco,
+                alignment=_align("center"),
+                border=_border(right=BORDER_MEDIUM))
 
             # ------------------------------------------------------------------
-            # 3. Salva
+            # Righe 3-4: CLASSE RISCHIO (merged, colorato)
             # ------------------------------------------------------------------
-            wb.save(path_output)
-            print(f"\nFile salvato in: {path_output}")
-        
-        inserisci_valutazione(path_riepilogo, path_totale, path_output)
+            _safe_merge(ws, riga0 + 3, M, riga0 + 4, T)
+            _set(ws, riga0 + 3, M,
+                value=f"CLASSE RISCHIO {classe}",
+                font=_font(bold=True, size=14, color=font_classe_color),
+                fill=fill_classe,
+                alignment=_align("center", "center"),
+                border=_border(left=BORDER_MEDIUM, right=BORDER_MEDIUM,
+                                top=BORDER_MEDIUM, bottom=BORDER_MEDIUM))
+
+            # Celle della seconda riga del merge — bordi del contorno
+            for c in range(N, T + 1):
+                _set(ws, riga0 + 4, c,
+                    border=_border(bottom=BORDER_MEDIUM,
+                                    right=BORDER_MEDIUM if c == T else BORDER_NONE))
+
+            # ------------------------------------------------------------------
+            # Larghezze colonne e altezze righe del blocco valutazione (se non
+            # già impostate)
+            # ------------------------------------------------------------------
+            col_widths = {M: 6, N: 7, O: 4, P: 6, Q: 4, R: 4, S: 28, T: 10}
+            for col_num, width in col_widths.items():
+                col_letter = get_column_letter(col_num)
+                cd = ws.column_dimensions[col_letter]
+                if cd.width is None or cd.width < 1:
+                    cd.width = width
+
+            row_heights = {riga0: 19, riga0 + 1: 28, riga0 + 2: 19, riga0 + 3: 16, riga0 + 4: 16}
+            for r, h in row_heights.items():
+                rd = ws.row_dimensions[r]
+                if rd.height is None or rd.height < 1:
+                    rd.height = h
+
+            print(f"  [OK] '{shname}': classe={classe}, Lex8h={lex8h}, U={u}, "
+                  f"Lex_max={lex_max}, L_picco_C={l_picco_c}")
+
+        # ---------------------------------------------------------------------------
+        # 4. Salva
+        # ---------------------------------------------------------------------------
+        if schede_scritte > 0:
+            del wb_out[foglio_default]
+        else:
+            print("  [AVVISO] nessuna 'Scheda N' scritta in path_output.")
+
+        wb_out.save(path_output)
+        print(f"\nFile salvato in: {path_output}")
 
 
     def transfer_riepilogo2aggiornato(path_riepilogo: str, path_aggiornato: str) -> None:
@@ -603,11 +602,14 @@ class exel_file:
 
         - Foglio 'Riepilogo': borda l'intero rettangolo di celle popolate (A1 -> ultima
           riga/colonna con contenuto).
-        - Fogli 'Scheda N': borda in maniera dinamica due aree distinte
-            1. la tabella dati a sinistra (colonna A fino all'ultima colonna
-               dell'intestazione, riga 1 fino all'ultima riga popolata);
+        - Fogli 'Scheda N': borda in maniera dinamica tre aree distinte
+            1. il blocco intestazione ID_GrOm/Descrizione_GrOm/ID_reparto/
+               Descrizione_reparto (righe 1-4, colonne A-B): solo il perimetro
+               esterno, nessuna riga interna;
             2. il blocco 'Analisi DPI in dotazione' (se presente), dal titolo fino
-               all'ultima riga/colonna popolata del blocco.
+               all'ultima riga/colonna contigua del blocco;
+            3. la tabella misure (se presente), dall'intestazione 'ID_misura' fino
+               all'ultima riga/colonna popolata.
           Il riquadro 'VALUTAZIONE SU BASE GIORNALIERA' non rientra in queste aree e
           conserva i suoi bordi 'medium'.
 
@@ -619,7 +621,7 @@ class exel_file:
             Percorso del file excel da bordare (modificato in place)
         """
         from openpyxl.styles import Border, Side
-        from config import TESTO_TITOLO_DPI
+        from config import TESTO_TITOLO_DPI, TESTO_INTESTAZIONE_MISURE
 
         BORDER_THIN = Side(border_style='thin', color='FF000000')
 
@@ -629,10 +631,13 @@ class exel_file:
                 return lato_esistente
             return BORDER_THIN if applica else lato_esistente
 
-        def _applica_bordi(ws, min_row, min_col, max_row, max_col):
+        def _applica_bordi(ws, min_row, min_col, max_row, max_col, solo_perimetro=False):
             """
             Borda il rettangolo indicato. Sulle celle unite disegna solo il perimetro
-            esterno del range, lasciando vuoti i lati interni.
+            esterno del range, lasciando vuoti i lati interni. Se solo_perimetro=True,
+            borda solo il contorno esterno dell'intero rettangolo (nessuna riga interna),
+            indipendentemente dai merge — usato per blocchi di celle non unite che devono
+            comunque apparire come un unico riquadro (es. intestazione GrOm/reparto).
             """
             if max_row < min_row or max_col < min_col:
                 return
@@ -650,15 +655,21 @@ class exel_file:
                                     min_col=min_col, max_col=max_col):
                 for cell in row:
                     r, c = cell.row, cell.column
-                    mr = _merge_di(r, c)
-                    if mr is None:
-                        left = top = right = bottom = True
+                    if solo_perimetro:
+                        left   = (c == min_col)
+                        right  = (c == max_col)
+                        top    = (r == min_row)
+                        bottom = (r == max_row)
                     else:
-                        # solo i lati sul perimetro del merge
-                        left   = (c == mr.min_col)
-                        right  = (c == mr.max_col)
-                        top    = (r == mr.min_row)
-                        bottom = (r == mr.max_row)
+                        mr = _merge_di(r, c)
+                        if mr is None:
+                            left = top = right = bottom = True
+                        else:
+                            # solo i lati sul perimetro del merge
+                            left   = (c == mr.min_col)
+                            right  = (c == mr.max_col)
+                            top    = (r == mr.min_row)
+                            bottom = (r == mr.max_row)
 
                     b = cell.border
                     cell.border = Border(
@@ -676,6 +687,21 @@ class exel_file:
                     if cell.value is not None:
                         last = cell.row
                         break
+            return last
+
+        def _ultima_riga_contigua(ws, min_col, max_col, from_row=1):
+            """
+            Ultima riga popolata prima della prima riga completamente vuota,
+            nell'intervallo di colonne indicato: si ferma al primo "buco", a
+            differenza di _ultima_riga_popolata che scansiona l'intero foglio.
+            Serve a non fondere un blocco con un altro che riusa le stesse colonne
+            più in basso (es. intestazione GrOm/tabella misure, entrambe su A-B).
+            """
+            last = from_row - 1
+            for row in ws.iter_rows(min_row=from_row, min_col=min_col, max_col=max_col):
+                if all(cell.value is None for cell in row):
+                    break
+                last = row[0].row
             return last
 
         def _ultima_col_popolata(ws, min_row, max_row, from_col=1):
@@ -700,6 +726,14 @@ class exel_file:
                 col = cell.column
             return col
 
+        def _trova_testo(ws, testo):
+            """Riga/colonna della prima cella il cui valore contiene 'testo'."""
+            for row in ws.iter_rows():
+                for cell in row:
+                    if cell.value is not None and testo in str(cell.value):
+                        return cell.row, cell.column
+            return None, None
+
         wb = ex.load_workbook(path)
 
         for ws in wb.worksheets:
@@ -707,26 +741,25 @@ class exel_file:
                 continue  # foglio vuoto
 
             if ws.title.strip().lower().startswith('scheda'):
-                # --- 1. Tabella dati a sinistra -------------------------------
+                # --- 1. Blocco intestazione GrOm/reparto: solo perimetro -------
                 max_col_tab = _ultima_col_contigua(ws, riga=1)
                 if max_col_tab > 0:
-                    max_row_tab = _ultima_riga_popolata(ws, 1, max_col_tab)
-                    _applica_bordi(ws, 1, 1, max_row_tab, max_col_tab)
+                    max_row_tab = _ultima_riga_contigua(ws, 1, max_col_tab, from_row=1)
+                    _applica_bordi(ws, 1, 1, max_row_tab, max_col_tab, solo_perimetro=True)
 
                 # --- 2. Blocco 'Analisi DPI in dotazione' ---------------------
-                riga_dpi = col_dpi = None
-                for row in ws.iter_rows():
-                    for cell in row:
-                        if cell.value is not None and TESTO_TITOLO_DPI in str(cell.value):
-                            riga_dpi, col_dpi = cell.row, cell.column
-                            break
-                    if riga_dpi is not None:
-                        break
-
+                riga_dpi, col_dpi = _trova_testo(ws, TESTO_TITOLO_DPI)
                 if riga_dpi is not None:
-                    max_row_dpi = _ultima_riga_popolata(ws, col_dpi, ws.max_column, from_row=riga_dpi)
+                    max_row_dpi = _ultima_riga_contigua(ws, col_dpi, ws.max_column, from_row=riga_dpi)
                     max_col_dpi = _ultima_col_popolata(ws, riga_dpi, max_row_dpi, from_col=col_dpi)
                     _applica_bordi(ws, riga_dpi, col_dpi, max_row_dpi, max_col_dpi)
+
+                # --- 3. Tabella misure -----------------------------------------
+                riga_mis, col_mis = _trova_testo(ws, TESTO_INTESTAZIONE_MISURE)
+                if riga_mis is not None:
+                    max_row_mis = _ultima_riga_popolata(ws, col_mis, ws.max_column, from_row=riga_mis)
+                    max_col_mis = _ultima_col_popolata(ws, riga_mis, max_row_mis, from_col=col_mis)
+                    _applica_bordi(ws, riga_mis, col_mis, max_row_mis, max_col_mis)
 
             else:
                 # Riepilogo (e ogni altro foglio): tutto il blocco popolato
@@ -738,15 +771,16 @@ class exel_file:
         wb.save(path)
         print(f"Bordi applicati nel file: {path}")
 
-    def formatta_dimensioni_celle(file_path: str, output_path: str = None, larghezza_colonna_V: float = 6) -> str:
+    def formatta_dimensioni_celle(file_path: str, output_path: str = None,
+                                   larghezza_colonna_etichetta_valutazione: float = 8) -> str:
         """
         Adatta automaticamente la larghezza delle colonne al contenuto in tutti i fogli
         del file Excel (stesso effetto del doppio click sul bordo di una colonna in
         Excel), foglio per foglio: ogni foglio ('Scheda N', 'Riepilogo', ecc.) viene
         dimensionato in base al proprio contenuto, colonna per colonna, incluse le
-        colonne dalla P in poi (blocchi "VALUTAZIONE SU BASE GIORNALIERA" e "Analisi DPI
-        in dotazione"), che risultano quindi strette dato che contengono per lo più
-        numeri ed etichette brevi.
+        colonne dei blocchi "VALUTAZIONE SU BASE GIORNALIERA" e "Analisi DPI in
+        dotazione", che risultano quindi strette dato che contengono per lo più numeri
+        ed etichette brevi.
 
         Le celle che fanno parte di un'unione (es. i titoli "VALUTAZIONE SU BASE
         GIORNALIERA" e "Analisi DPI in dotazione", che occupano molte colonne) vengono
@@ -754,17 +788,19 @@ class exel_file:
         bordo di una colonna: il loro contenuto non deve gonfiare la larghezza di una
         singola colonna sottostante.
 
-        Nei fogli 'Scheda N' vengono inoltre normalizzate le altezze delle righe 2-6
-        (blocco valutazione), così da avere lo stesso aspetto su tutte le schede, e la
-        larghezza della colonna V viene forzata al valore fisso `larghezza_colonna_V`
-        (etichetta "Massimo dei Lpicco,C misurati =" in font grande, per cui l'autofit
-        calcolato sul solo numero di caratteri risulta impreciso).
+        Nei fogli 'Scheda N' la colonna che ospita le etichette "LEX MAX ="/"Massimo
+        dei Lpicco,C misurati =" (colonna COL_INIZIO_VALUTAZIONE + OFFSET_ETICHETTA_
+        VALUTAZIONE, cioè "G" nel layout attuale) viene forzata al valore fisso
+        `larghezza_colonna_etichetta_valutazione`: quella colonna ospita anche il
+        campo "H" del blocco DPI (poche cifre), e l'autofit calcolato sul solo numero
+        di caratteri delle etichette (in font 14pt, molto più largo del default)
+        la renderebbe sproporzionata rispetto al resto della tabella DPI.
 
         Args:
-            file_path:            Percorso del file Excel di input.
-            output_path:          Percorso di output (opzionale). Se None, sovrascrive il file originale.
-            larghezza_colonna_V:  Larghezza fissa da applicare alla colonna V dei fogli
-                                  'Scheda N' (default: 43).
+            file_path:                                Percorso del file Excel di input.
+            output_path:                               Percorso di output (opzionale). Se None, sovrascrive il file originale.
+            larghezza_colonna_etichetta_valutazione:   Larghezza fissa da applicare alla colonna
+                                                        dell'etichetta valutazione nei fogli 'Scheda N' (default: 8).
 
         Returns:
             Percorso del file salvato.
@@ -773,6 +809,7 @@ class exel_file:
         from openpyxl import load_workbook
         from openpyxl.utils import get_column_letter
         from builtins import max as builtin_max
+        from config import COL_INIZIO_VALUTAZIONE, OFFSET_ETICHETTA_VALUTAZIONE
 
         if not path.isfile(file_path):
             raise FileNotFoundError(f"File non trovato: {file_path}")
@@ -784,7 +821,7 @@ class exel_file:
 
         wb = load_workbook(output_path)
 
-        ALTEZZE_RIGHE_VALUTAZIONE = {2: 19, 3: 28, 4: 19, 5: 16, 6: 16}
+        colonna_etichetta_valutazione = get_column_letter(COL_INIZIO_VALUTAZIONE + OFFSET_ETICHETTA_VALUTAZIONE)
 
         for ws in wb.worksheets:
             celle_unite = set()
@@ -807,15 +844,69 @@ class exel_file:
                 ws.column_dimensions[col_letter].width = builtin_max(lunghezza + 2, 8)
 
             if ws.title.strip().lower().startswith('scheda'):
-                # for riga, altezza in ALTEZZE_RIGHE_VALUTAZIONE.items():
-                #     ws.row_dimensions[riga].height = altezza
-                ws.column_dimensions['V'].width = larghezza_colonna_V
+                ws.column_dimensions[colonna_etichetta_valutazione].width = larghezza_colonna_etichetta_valutazione
 
-            
-        
         wb.save(output_path)
         print(f"Dimensioni celle adattate al contenuto in: {output_path}")
         return output_path
+
+    def inserisci_tabella_misure(ws, riga_iniziale: int, df_misure) -> int:
+        """
+        Scrive nel foglio ws, a partire da riga_iniziale, la tabella delle misure
+        (intestazione ID_misura/Descrizione_compito/Ti/WBV/HAV/U/LeqA/LeqC/Ppeak in
+        grassetto, poi una riga per ogni misura di df_misure), riapplicando i colori
+        delle colonne U/LeqA/Ppeak (stessa palette di formatting_excel_VR8h_totale) —
+        un pd.read_excel "fresco" non porta con sé la formattazione ereditata altrove.
+
+        riga_iniziale è a carico del chiamante: nell'uso reale (applica_DPI_HML) vale
+        "due righe dopo l'ultima riga della tabella DPI", calcolato lì perché solo lì
+        si conosce il numero di DPI scritti — questa funzione non sa nulla del blocco
+        DPI e non prova a dedurne la posizione.
+
+        Parametri
+        ----------
+        ws : openpyxl.worksheet.worksheet.Worksheet
+            Foglio già aperto in cui scrivere (nessuna apertura/salvataggio qui).
+        riga_iniziale : int
+            Riga in cui scrivere l'intestazione della tabella misure.
+        df_misure : pd.DataFrame
+            Dati delle misure del gruppo omogeneo corrente; deve contenere almeno
+            le colonne elencate in config.COLONNE_TABELLA_MISURE.
+
+        Ritorna
+        -------
+        int : l'ultima riga scritta (riga_iniziale + len(df_misure)).
+        """
+        import pandas as pd
+        from openpyxl.styles import Font, PatternFill
+        from config import (COL_INIZIO_VALUTAZIONE, COLONNE_TABELLA_MISURE,
+                            COLORE_FILL_U, COLORE_FILL_LEQA, COLORE_FILL_PPEAK)
+
+        col_iniziale = COL_INIZIO_VALUTAZIONE
+        fill_per_colonna = {
+            'U':     PatternFill(fill_type='solid', fgColor=COLORE_FILL_U),
+            'LeqA':  PatternFill(fill_type='solid', fgColor=COLORE_FILL_LEQA),
+            'Ppeak': PatternFill(fill_type='solid', fgColor=COLORE_FILL_PPEAK),
+        }
+
+        for offset, nome_col in enumerate(COLONNE_TABELLA_MISURE):
+            cell = ws.cell(row=riga_iniziale, column=col_iniziale + offset)
+            cell.value = nome_col
+            cell.font = Font(bold=True)
+
+        for i in range(len(df_misure)):
+            riga_corrente = riga_iniziale + 1 + i
+            for offset, nome_col in enumerate(COLONNE_TABELLA_MISURE):
+                valore = df_misure.iloc[i][nome_col]
+                if pd.isna(valore):
+                    valore = None
+                cell = ws.cell(row=riga_corrente, column=col_iniziale + offset)
+                cell.value = valore
+                if nome_col in fill_per_colonna:
+                    cell.fill = fill_per_colonna[nome_col]
+
+        print(f"  → Tabella misure scritta da riga {riga_iniziale} ({len(df_misure)} misure)")
+        return riga_iniziale + len(df_misure)
 
 
 class files:
@@ -2198,10 +2289,11 @@ class analisi:
 
         # ── Step 2: itera sulle schede e sui DPI  ───────────────────────────────
         for idx_sn, sn in enumerate(sheet_names_heg): #itero sulle schede omogenee
-            
+
+            df_heg = pd.read_excel(excel_total, sheet_name=sn) #leggo il foglio heg (misure) una sola volta per scheda
+
             #itero sui dpi
-            for dpi_idx in range(len(df_dpi)): 
-                df_heg = pd.read_excel(excel_total, sheet_name=sn) #leggo il foglio heg e mi salvo i dati
+            for dpi_idx in range(len(df_dpi)):
                 dpi = df_dpi.loc[dpi_idx] #seleziono la riga del dpi con le informazioni
 
                 print(f'\n── {dpi.codice_DPI} | {dpi.Marca} {dpi.Modello} '
@@ -2227,9 +2319,13 @@ class analisi:
                 # ── Scrittura su excel_aggiornato ────────────────────────────────────
             
             from openpyxl.styles import Font
-            from config import COL_INIZIO_DPI, FIND_TESTO_FINE_TABELLA_VALUTAZIONE, SEPARAZIONE_RIGHE_DA_VALUTAZIONE, TESTO_TITOLO_DPI
+            from config import (COL_INIZIO_DPI, FIND_TESTO_FINE_TABELLA_VALUTAZIONE,
+                                SEPARAZIONE_RIGHE_DA_VALUTAZIONE, TESTO_TITOLO_DPI,
+                                SEPARAZIONE_RIGHE_DPI_MISURE)
             # ── CONFIGURAZIONE ─────────────────────────────────────────────────
-            # Colonna di ancoraggio della sezione DPI (14 = colonna N)
+            # Colonna di ancoraggio della sezione DPI (deve coincidere con la colonna
+            # in cui inserisci_valutazione_schede scrive il blocco valutazione, dato
+            # che la ricerca di TESTO_FINE_VALUTAZIONE più sotto guarda solo qui)
             COL_INIZIO = COL_INIZIO_DPI
 
             # Stringa da cercare in COL_INIZIO per localizzare la fine
@@ -2278,15 +2374,21 @@ class analisi:
             ws_ag = wb_ag[sn]
 
             # ── Trova dinamicamente l'ultima riga della tabella VALUTAZIONE ───
-            # Se la cella appartiene a un merge, si usa l'ultima riga del range
+            # Se la cella appartiene a un merge, si usa l'ultima riga del range.
+            # prima_riga_classe_rischio (prima riga dello stesso merge) serve più
+            # sotto per individuare la riga "Massimo dei Lpicco,C misurati =", che
+            # è sempre quella immediatamente sopra il merge CLASSE RISCHIO.
             ultima_riga_val = None
+            prima_riga_classe_rischio = None
             for row_cells in ws_ag.iter_rows(min_col=COL_INIZIO, max_col=COL_INIZIO):
                 cell = row_cells[0]
                 if cell.value and TESTO_FINE_VALUTAZIONE in str(cell.value):
                     ultima_riga_val = cell.row
+                    prima_riga_classe_rischio = cell.row
                     for mr in ws_ag.merged_cells.ranges:
                         if mr.min_row == cell.row and mr.min_col == COL_INIZIO:
                             ultima_riga_val = mr.max_row
+                            prima_riga_classe_rischio = mr.min_row
                             break
                     break
 
@@ -2306,15 +2408,17 @@ class analisi:
                 col_valutazione   = col_fine_sezione + 1
 
                 # ── Colonna Lpicco_rid: attiva solo se il Massimo dei Lpicco,C ─
-                # (riga 4, cercato per etichetta) supera la soglia ──────────────
+                # (cercato per etichetta nella riga subito sopra il merge CLASSE
+                # RISCHIO) supera la soglia ──────────────────────────────────────
                 NOME_COL_LPICCO_RID = 'Lpicco_rid'
                 SOGLIA_LPICCO_MAX = 135
                 col_lpicco_rid = col_valutazione + 1
 
                 lpicco_max = None
-                for cell in ws_ag[4]:
+                riga_lpicco = prima_riga_classe_rischio - 1
+                for cell in ws_ag[riga_lpicco]:
                     if cell.value and "Massimo dei Lpicco" in str(cell.value):
-                        lpicco_max = ws_ag.cell(row=4, column=cell.column + 1).value
+                        lpicco_max = ws_ag.cell(row=riga_lpicco, column=cell.column + 1).value
                         break
 
                 scrivi_lpicco_rid = isinstance(lpicco_max, (int, float)) and lpicco_max > SOGLIA_LPICCO_MAX
@@ -2403,6 +2507,12 @@ class analisi:
                         if hex_lpicco:
                             cell_lpicco.fill = PatternFill(fill_type='solid', fgColor=hex_lpicco)
 
+                # ── Tabella misure: SEPARAZIONE_RIGHE_DPI_MISURE righe dopo ────
+                # l'ultima riga della tabella DPI appena scritta.
+                ultima_riga_dpi = (riga_dati_base + len(df_dpi) - 1) if len(df_dpi) > 0 else riga_intestazioni
+                riga_iniziale_misure = ultima_riga_dpi + SEPARAZIONE_RIGHE_DPI_MISURE + 1
+                exel_file.inserisci_tabella_misure(ws_ag, riga_iniziale_misure, df_heg)
+
                 # ── Salva e chiudi ────────────────────────────────────────────
                 wb_ag.save(excel_aggiornato)
                 wb_ag.close()
@@ -2414,7 +2524,7 @@ class analisi:
         # Ri-applico i bordi per includere anche le sezioni DPI appena scritte
         exel_file.colora_bordi_celle(excel_aggiornato)
 
-        # Uniformo le dimensioni delle celle (colonne P in poi come da Scheda di riferimento)
+        # Uniformo le dimensioni delle celle di tutte le schede al loro contenuto
         exel_file.formatta_dimensioni_celle(excel_aggiornato)
 
         print('\nApplicazione DPI HML completata.')
