@@ -17,9 +17,16 @@ import os
 import pandas as pd
 import openpyxl
 from openpyxl.utils import column_index_from_string
+from openpyxl.styles import Font, PatternFill
 
 SCHEDA_MANSIONI = "Scheda_mansioni"
 OUTPUT_DEFAULT = "dati_misure.xlsx"
+
+FONT_BIANCO = Font(color="FFFFFF")
+FILL_VERDE = PatternFill(start_color="008000", end_color="008000", fill_type="solid")
+FILL_AZZURRO = PatternFill(start_color="00BFFF", end_color="00BFFF", fill_type="solid")
+FILL_ROSSO = PatternFill(start_color="DC143C", end_color="DC143C", fill_type="solid")
+SOGLIA_PPEAK_MAX = 135.0
 
 
 # ---------------------------------------------------------------------------
@@ -120,6 +127,26 @@ def _get_descrizione(scheda_df, id_misura):
     return ""
 
 
+def _colora_leqa(cell, value):
+    """Colora la cella LAEQ,Tp in base alla soglia di rischio, testo bianco."""
+    if value is None or pd.isna(value):
+        return
+    if value < 80.0:
+        cell.fill = FILL_VERDE
+    elif value <= 85.0:
+        cell.fill = FILL_AZZURRO
+    else:
+        cell.fill = FILL_ROSSO
+    cell.font = FONT_BIANCO
+
+
+def _colora_ppeak(cell, value):
+    """Colora la cella PPEAK(C) di rosso con testo bianco se supera la soglia."""
+    if value is not None and not pd.isna(value) and value > SOGLIA_PPEAK_MAX:
+        cell.fill = FILL_ROSSO
+        cell.font = FONT_BIANCO
+
+
 def _get_track(mis_df, letter_id, n_track):
     """Ritorna dict con i valori di una traccia, o None se non trovata."""
     if mis_df.empty:
@@ -156,8 +183,14 @@ def write_excel(df_avg, df_mis, df_scheda, output_path):
         ws.cell(row=excel_row, column=1,  value=id_misura)
         ws.cell(row=excel_row, column=2,  value=_get_descrizione(df_scheda, id_misura))
         ws.cell(row=excel_row, column=3,  value=avg_row.get("U",     None))
-        ws.cell(row=excel_row, column=4,  value=avg_row.get("Ppeak", None))
-        ws.cell(row=excel_row, column=5,  value=avg_row.get("LeqA",  None))
+
+        ppeak_val = avg_row.get("Ppeak", None)
+        leqa_val  = avg_row.get("LeqA",  None)
+        cell_ppeak = ws.cell(row=excel_row, column=4, value=ppeak_val)
+        cell_leqa  = ws.cell(row=excel_row, column=5, value=leqa_val)
+        _colora_ppeak(cell_ppeak, ppeak_val)
+        _colora_leqa(cell_leqa, leqa_val)
+
         ws.cell(row=excel_row, column=6,  value=avg_row.get("LeqC",  None))
 
         # Tutte le tracce: 4 colonne ciascuna (Sec, LAeq, LCeq, Lpicco)
@@ -170,6 +203,13 @@ def write_excel(df_avg, df_mis, df_scheda, output_path):
                 ws.cell(row=excel_row, column=col_start + 3, value=t["ppeak"])
 
         excel_row += 1
+
+    max_len = len(str(ws["B1"].value or ""))
+    for row in range(4, excel_row):
+        val = ws.cell(row=row, column=2).value
+        if val:
+            max_len = max(max_len, len(str(val)))
+    ws.column_dimensions["B"].width = max(max_len + 2, 8)
 
     wb.save(output_path)
     print(f"File salvato: {output_path}  ({excel_row - 4} righe dati)")
