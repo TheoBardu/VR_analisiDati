@@ -18,6 +18,7 @@ context = {
     "nome_azienda": "PARESA S.R.L.", 
     "indirizzo_azienda": "vicolo malvasia 980 (FC)",
     "note_titolo" : "relazione per la sede di mantova",
+    "data_emissione": "16/03/2026",
     "revisione": "rev.01",
     "data_revisione": "16/03/2026",
     "data_scadenza": "16/03/2030",
@@ -27,17 +28,18 @@ context = {
     "RSPP" : "",    #da modificare
     "medico_competente": "",    #da modificare
     "RLS" : "",    #da modificare
+    "delegato_sicurezza": "", #da inserire
     "giornate" : "Nelle giornate 12 e 13 settembre 2026", #modifica con le date giuste,
     #Info generali azienda
     "attivita_azienda": "",    #da modificare
+    "processo_produttivo": "", #da modificare
     "gruppo_appartenenza" : "",    #da modificare
     "sede_legale" : "",    #da modificare
+    "sede_operativa":"", #da modificare
     "ubicazione_unita_operativa" : "",     #da modificare
     "date_misurazione":["05 dicembre 2025 dalle ore 08:00 alle ore 16:00",
                         "",
                         ""], #da modificare
-    "strumentazione": "FUSION+DUO+FUSION+WED (01dB) / CAL 21 (01dB)",
-    "condizioni_meteo": "Le condizioni meteo non hanno inficiato le misurazioni",
     "sostanze_ototossiche": "Si", #presenza di sostanze ototossiche o meno
     "misure_attuative_ototossiche": "Si faccia riferimento al documento di valutazione del rischio chimico.",
     "interazione_vib_rum": "Si", #presenza di interazione tra rumore e vibrazione
@@ -45,6 +47,12 @@ context = {
     "effetti_indesiderati": "Si",
     "misure_attuative_effetti_indesiderati": "Nelle zone/postazioni di lavoro è possibile che gli addetti possano incorrere in tali situazioni. Si consiglia pertanto di utilizzare D.P.I. con grado di protezione SNR come prescritto dalla presente relazione e l’adozione di sistemi alternativi quali segnali oto-acustici.",
     "descrizione_attivita_dettaglio":"boh", #dettaglio della mansione
+}
+
+valutazione_context = {
+    "base_giornaliera":"",
+    "base_settimanale":"",
+    "esposizioni_variabili": ""
 }
 
 # Dizionari separati per le tabelle
