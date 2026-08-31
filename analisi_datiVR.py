@@ -183,11 +183,8 @@ class exel_file:
 
     def colora_classe_rischio(path: str) -> None:
         from openpyxl import load_workbook
-        COLORI = {
-            "BASSA": "32CD32",
-            "MEDIA": "00BFFF",
-            "ALTA":  "B22222",
-        }
+        from config import COLORI_CLASSE_RISCHIO
+        COLORI = {classe: colori["sfondo"] for classe, colori in COLORI_CLASSE_RISCHIO.items()}
 
         wb = load_workbook(path)
     
@@ -250,16 +247,16 @@ class exel_file:
         from openpyxl.utils import get_column_letter
         from config import (RIGA_INIZIO_INTESTAZIONE_GROM, COL_ETICHETTA_INTESTAZIONE_GROM,
                             COL_VALORE_INTESTAZIONE_GROM, RIGA_INIZIO_VALUTAZIONE,
-                            COL_INIZIO_VALUTAZIONE, OFFSET_ETICHETTA_VALUTAZIONE)
+                            COL_INIZIO_VALUTAZIONE, OFFSET_ETICHETTA_VALUTAZIONE,
+                            COLORI_CLASSE_RISCHIO)
 
 
         # ---------------------------------------------------------------------------
         # Palette colori classe_rischio (rgb in formato AARRGGBB / RRGGBB)
         # ---------------------------------------------------------------------------
         CLASSE_FILL = {
-            "BASSA":  {"bg": "FF32CD32", "font_color": "FF000000"},  # verde lime
-            "MEDIA":  {"bg": "FF00BFFF", "font_color": "FF000000"},  # azzurro
-            "ALTA":   {"bg": "FFB22222", "font_color": "FFFFFFFF"},  # rosso scuro
+            classe: {"bg": "FF" + colori["sfondo"], "font_color": "FF" + colori["font"]}
+            for classe, colori in COLORI_CLASSE_RISCHIO.items()
         }
 
         # ---------------------------------------------------------------------------

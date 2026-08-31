@@ -48,3 +48,15 @@ COLONNE_TABELLA_MISURE = ['ID_misura', 'Descrizione_compito', 'Ti', 'WBV', 'HAV'
 COLORE_FILL_U = '87CEEB'      # azzurro, stessa palette di formatting_excel_VR8h_totale
 COLORE_FILL_LEQA = 'FFA07A'   # arancione
 COLORE_FILL_PPEAK = 'FF4500'  # rosso scuro
+
+# Nome del foglio del file VR8h_riepilogo.xlsx
+SHEET_RIEPILOGO = 'Riepilogo'
+
+# Palette delle classi di rischio (rgb a 6 cifre, senza canale alfa).
+# Unica definizione condivisa da: colorazione dell'excel di riepilogo, blocco di
+# valutazione nelle schede HEG e tabelle della relazione word.
+COLORI_CLASSE_RISCHIO = {
+    "BASSA": {"sfondo": "32CD32", "font": "000000"},   # verde lime
+    "MEDIA": {"sfondo": "00BFFF", "font": "000000"},   # azzurro
+    "ALTA":  {"sfondo": "B22222", "font": "FFFFFF"},   # rosso scuro
+}
