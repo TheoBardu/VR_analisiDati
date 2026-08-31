@@ -80,11 +80,10 @@ context_tabella_orari = {
 
 #Pensare se farla prendere da tabella excel
 context_tabella_mansioni = {
-    "tabella_mansioni_numero_lavoratori": [
+    "tabella_mansioni": [
         {
-            "ID": "",
-            "Mansione": " Nome mansione",
-            "N_lavoratori" : ""
+            "ID": "", #questo è l'ID_GrOm della tabella mansioni del file excel scheda_gruppi_dpi.xlsx
+            "Mansione": " Nome mansione", #Questo è Descrizione_GrOm della tabella mansioni del file excel scheda_gruppi_dpi.xlsx
         }
     ],
 }
@@ -94,18 +93,44 @@ context_tabella_heg = {
     "tabella_HEG":[
         {"gruppo_HEG": "", #Nome del gruppo omogeneo (es: carrellista)
         "numero_scheda":"", # Numero della scheda del gruppo omogeneo (es: 1)
-        "codice_HEG": "" ,#codice del gruppo omogeneo (es: M01)
-        "parametro_riferimento": "Lex,8h",
         "lex8h": "",
-        "incertezza": "",
+        "U": "",
         "lexmax":"",
         "peakmax":"",
         "classe_rischio": "", #es: alta, media o bassa
-        "esposizione_vibrazioni": "HAV", #WBV, HAV o NO
-        "esposizione_ototossici": "", #si no
-        "rumori_impulsivi":"", #si no
+        "vib": "HAV", #WBV, HAV o NO
+        "oto": "", #si no
+        "imp":"", #si no
         }
     ],
+}
+
+# Qui ci vanno solo le classi di rischio medio 
+context_tabella_heg_medio = {
+    "HEG_med":[
+            {"gruppo_HEG": "", #Nome del gruppo omogeneo (es: carrellista)
+            "numero_scheda":"", # Numero della scheda del gruppo omogeneo (es: 1)
+            "lex8h": "",
+            "U": "",
+            "lexmax":"",
+            "peakmax":"",
+            "classe_rischio": "", #es: alta, media o bassa
+            },
+    ]
+}
+
+#qui ci vanno solo le classi con classe di rischio ALTO
+context_tabella_heg_alto = {
+    "HEG_alto":[
+            {"gruppo_HEG": "", #Nome del gruppo omogeneo (es: carrellista)
+            "numero_scheda":"", # Numero della scheda del gruppo omogeneo (es: 1)
+            "lex8h": "",
+            "U": "",
+            "lexmax":"",
+            "peakmax":"",
+            "classe_rischio": "", #es: alta, media o bassa
+            },
+    ]
 }
 
 # Unione di tutti i dizionari
