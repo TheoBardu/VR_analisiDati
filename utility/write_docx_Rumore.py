@@ -11,6 +11,7 @@
 # poi le parti che il codice recupera da solo.
 
 import sys
+import tempfile
 from os import path
 
 from docxtpl import DocxTemplate, InlineImage, RichText
@@ -326,7 +327,8 @@ def costruisci_frontespizio(documento, file_frontespizio, contesto):
 
     Il render va fatto in due passate: docxtpl inserisce il sottodocumento cosi' com'e',
     senza rielaborarne i tag Jinja, quindi le variabili del frontespizio vanno risolte
-    prima. Il file intermedio viene scritto accanto all'output finale.
+    prima. Il file intermedio viene scritto in una cartella temporanea, cancellata
+    subito dopo la lettura, per non lasciare residui nella cartella di output.
     '''
     if not path.isfile(file_frontespizio):
         from glob import glob
@@ -334,16 +336,17 @@ def costruisci_frontespizio(documento, file_frontespizio, contesto):
         raise FileNotFoundError(f'Frontespizio non trovato: {file_frontespizio}\n'
                                 f'Frontespizi disponibili in {DIR_FRONTESPIZI}: {disponibili}')
 
-    frontespizio_reso = path.join(path.dirname(OUTPUT_DOCUMENT), '_frontespizio_reso.docx')
-
     template_frontespizio = DocxTemplate(file_frontespizio)
     contesto_frontespizio = dict(contesto)
     # L'immagine e' legata al documento che la ospita: ne serve una per ogni template.
     contesto_frontespizio['img_logo_azienda'] = logo_inline(template_frontespizio)
     template_frontespizio.render(contesto_frontespizio)
-    template_frontespizio.save(frontespizio_reso)
 
-    return documento.new_subdoc(frontespizio_reso)
+    with tempfile.TemporaryDirectory() as cartella_temporanea:
+        frontespizio_reso = path.join(cartella_temporanea, '_frontespizio_reso.docx')
+        template_frontespizio.save(frontespizio_reso)
+        # new_subdoc legge subito il file: la cartella puo' essere rimossa qui.
+        return documento.new_subdoc(frontespizio_reso)
 
 
 # ==========================================================================
