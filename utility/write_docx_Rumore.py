@@ -7,14 +7,23 @@
 #   - scheda_gruppi_dpi.xlsx  -> mansioni, gruppi omogenei, DPI, esposizione a vibrazioni
 #   - VR8h_riepilogo.xlsx     -> Lex8h, incertezza, Lex max, picco e classe di rischio
 #
+# Il frontespizio e' un .docx a parte inserito come sottodocumento: intestazione e
+# pie' di pagina della prima pagina della relazione sono quelli visibili sul
+# frontespizio scelto (vuoti se il frontespizio non li ha), dalla seconda pagina
+# valgono quelli del modello.
+#
 # Il file e' diviso in sezioni: prima quello che l'utente deve compilare a mano,
 # poi le parti che il codice recupera da solo.
 
+import copy
 import sys
 import tempfile
 from os import path
 
 from docxtpl import DocxTemplate, InlineImage, RichText
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
+from docx.enum.section import WD_HEADER_FOOTER
 from docx.shared import Mm
 
 # insert e non append: esiste un pacchetto 'config' in site-packages che altrimenti vince
@@ -41,8 +50,8 @@ DIR_MODELLI       = '/Users/theo/Desktop/P.IVA/Aziende/Ermes/Modelli/docx/strutt
 DOCUMENTO_WORD_TEMPLATE = DIR_MODELLI + '/Modello_RUM.docx'
 
 # Cartella con i frontespizi selezionabili e nome di quello da usare
-DIR_FRONTESPIZI = DIR_MODELLI + '/frontespizi'
-FRONTESPIZIO    = 'frontespizio_relyon.docx'
+DIR_FRONTESPIZI = path.dirname(DIR_MODELLI) + '/frontespizi/RUM'
+FRONTESPIZIO    = 'frontespizio_Relyon_RUM.docx'
 
 # Logo aziendale inserito nell'intestazione e nel frontespizio
 LOGO_AZIENDA = '/Users/theo/Desktop/1631305251718.jpeg'
@@ -366,6 +375,85 @@ def costruisci_frontespizio(documento, file_frontespizio, contesto):
         return documento.new_subdoc(frontespizio_reso)
 
 
+# Attributi che puntano a una relazione della parte (immagini, collegamenti).
+ATTRIBUTI_RELAZIONE = (qn('r:embed'), qn('r:id'), qn('r:link'))
+
+
+def _parte_sezione(docx_documento, sezione, quale, prima_pagina):
+    '''
+    Parte header/footer della sezione (oggetto Part) o None se la sezione non ha il
+    riferimento. Si passa dalle relazioni del documento e non da section.header &
+    co.: dopo il render docxtpl sostituisce le parti nelle relazioni, ma python-docx
+    continua a restituire quelle originali (non renderizzate e non salvate).
+    '''
+    tipo = WD_HEADER_FOOTER.FIRST_PAGE if prima_pagina else WD_HEADER_FOOTER.PRIMARY
+    if quale == 'header':
+        riferimento = sezione._sectPr.get_headerReference(tipo)
+    else:
+        riferimento = sezione._sectPr.get_footerReference(tipo)
+    if riferimento is None:
+        return None
+    return docx_documento.part.rels[riferimento.rId].target_part
+
+
+def _parte_visibile(docx_documento, sezione, quale):
+    '''Header/footer che si vede sulla prima pagina della sezione, o None.'''
+    return _parte_sezione(docx_documento, sezione, quale,
+                          sezione.different_first_page_header_footer)
+
+
+def _copia_parte(sorgente, destinazione):
+    '''Sostituisce il contenuto di destinazione con quello di sorgente (None = vuoto).'''
+    elemento = destinazione.element
+    for figlio in list(elemento):
+        elemento.remove(figlio)
+    if sorgente is None:
+        elemento.append(OxmlElement('w:p'))
+        return
+    for figlio in sorgente.element:
+        nuovo = copy.deepcopy(figlio)
+        # immagini e link dell'intestazione: la relazione va ricreata nella parte di arrivo
+        for nodo in nuovo.iter():
+            for attributo in ATTRIBUTI_RELAZIONE:
+                rid = nodo.get(attributo)
+                if not rid:
+                    continue
+                rel = sorgente.rels[rid]
+                if rel.is_external:
+                    nuovo_rid = destinazione.relate_to(rel.target_ref, rel.reltype, is_external=True)
+                else:
+                    nuovo_rid = destinazione.relate_to(rel.target_part, rel.reltype)
+                nodo.set(attributo, nuovo_rid)
+        elemento.append(nuovo)
+
+
+def applica_intestazioni_frontespizio(documento, file_frontespizio, contesto):
+    '''
+    Porta nella prima sezione del documento (gia' renderizzato) intestazione e
+    pie' di pagina della pagina del frontespizio: docxtpl inserisce il
+    sottodocumento senza sezione, quindi la prima pagina userebbe quelli del
+    modello. Se il frontespizio non li ha, restano vuoti.
+    '''
+    template_frontespizio = DocxTemplate(file_frontespizio)
+    contesto_frontespizio = dict(contesto)
+    contesto_frontespizio.pop('frontespizio', None)
+    contesto_frontespizio['img_logo_azienda'] = logo_inline(template_frontespizio)
+    template_frontespizio.render(contesto_frontespizio)
+
+    # .docx e non get_docx(): dopo il render get_docx() ricarica il template da file
+    # e butta via il documento renderizzato.
+    docx_frontespizio = template_frontespizio.docx
+    docx_documento = documento.docx
+    sorgente = docx_frontespizio.sections[0]
+    prima = docx_documento.sections[0]
+    prima.different_first_page_header_footer = True
+    for quale, parte in (('header', prima.first_page_header),
+                         ('footer', prima.first_page_footer)):
+        parte.is_linked_to_previous = False   # crea parte e riferimento se mancano
+        _copia_parte(_parte_visibile(docx_frontespizio, sorgente, quale),
+                     _parte_sezione(docx_documento, prima, quale, True))
+
+
 # ==========================================================================
 # SEZIONE 3 - COSTRUZIONE DEI CONTEXT AUTOMATICI
 # ==========================================================================
@@ -417,6 +505,7 @@ context_completo["img_logo_azienda"] = logo_inline(doc)
 # SEZIONE 4 - SCRITTURA DEL DOCUMENTO
 # ==========================================================================
 doc.render(context_completo)
+applica_intestazioni_frontespizio(doc, path.join(DIR_FRONTESPIZI, FRONTESPIZIO), context_completo)
 doc.save(OUTPUT_DOCUMENT)
 
 print(f'Docx scritto: {OUTPUT_DOCUMENT}')
