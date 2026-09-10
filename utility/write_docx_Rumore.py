@@ -151,7 +151,9 @@ def leggi_scheda_mansioni(file_scheda_gruppi_dpi):
     '''
     import pandas as pd
 
-    return pd.read_excel(file_scheda_gruppi_dpi, sheet_name=SCHEDA_MANSIONI, skiprows=1)
+    # ID_GrOm letto come testo: gli ID sono etichette (es. '8.2', 'A3'), non numeri
+    return pd.read_excel(file_scheda_gruppi_dpi, sheet_name=SCHEDA_MANSIONI, skiprows=1,
+                         dtype={Nome_colonna_IDgrom: str})
 
 
 def carica_mansioni(df_mansioni):
@@ -160,13 +162,13 @@ def carica_mansioni(df_mansioni):
     ID_GrOm, mantenendo l'ordine del foglio.
 
     OUTPUT:
-        <list> di dizionari {"ID": <numero scheda>, "Mansione": <descrizione>}.
+        <list> di dizionari {"ID": <ID scheda, str>, "Mansione": <descrizione>}.
     '''
     df_gruppi = df_mansioni.dropna(subset=[Nome_colonna_IDgrom])
     df_gruppi = df_gruppi.drop_duplicates(subset=[Nome_colonna_IDgrom], keep='first')
 
     return [
-        {"ID": formatta_numero(riga[Nome_colonna_IDgrom], decimali=0),
+        {"ID": formatta_id(riga[Nome_colonna_IDgrom]),
          "Mansione": str(riga[Nome_colonna_Descrizione_GrOm]).strip()}
         for _, riga in df_gruppi.iterrows()
     ]
@@ -205,7 +207,7 @@ def carica_vibrazioni(df_mansioni):
     for id_grom, gruppo in df_mansioni.groupby(Nome_colonna_IDgrom, sort=False):
         presenti = [colonna for colonna in ('HAV', 'WBV')
                     if colonna in gruppo.columns and gruppo[colonna].notna().any()]
-        chiave = formatta_numero(id_grom, decimali=0)
+        chiave = formatta_id(id_grom)
         esposizione[chiave] = ' + '.join(presenti) if presenti else 'NO'
 
     return esposizione
@@ -245,7 +247,7 @@ def carica_riepilogo_heg(file_riepilogo, esposizione_vibrazioni):
         if valore(numero_riga, 'ID_GrOm') is None:
             continue
 
-        id_grom = formatta_numero(valore(numero_riga, 'ID_GrOm'), decimali=0)
+        id_grom = formatta_id(valore(numero_riga, 'ID_GrOm'))
         classe = str(valore(numero_riga, 'classe_rischio') or '').strip().upper()
         cella_classe = foglio.cell(row=numero_riga, column=intestazioni['classe_rischio'])
 
@@ -290,6 +292,21 @@ def colore_font_classe(classe):
 def filtra_per_classe(righe_heg, classe):
     '''Sottoinsieme del quadro sinottico per una data classe di rischio.'''
     return [riga for riga in righe_heg if riga['classe'] == classe]
+
+
+def formatta_id(valore):
+    '''
+    Restituisce un ID (gruppo omogeneo, scheda, ...) come testo, senza mai passare
+    per float: '8.2' resta '8.2', 'A3' resta 'A3'. Solo se la cella excel e' un
+    numero intero salvato come float (8.0) viene riportato senza il '.0'.
+    '''
+    import pandas as pd
+
+    if valore is None or (isinstance(valore, float) and pd.isna(valore)):
+        return ''
+    if isinstance(valore, float) and valore.is_integer():
+        return str(int(valore))
+    return str(valore).strip()
 
 
 def formatta_numero(valore, decimali=1):
