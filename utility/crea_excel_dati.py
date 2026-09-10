@@ -17,7 +17,7 @@ import os
 import pandas as pd
 import openpyxl
 from openpyxl.utils import column_index_from_string
-from openpyxl.styles import Font, PatternFill
+from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
 
 SCHEDA_MANSIONI = "Scheda_mansioni"
 OUTPUT_DEFAULT = "dati_misure.xlsx"
@@ -27,6 +27,11 @@ FILL_VERDE = PatternFill(start_color="008000", end_color="008000", fill_type="so
 FILL_AZZURRO = PatternFill(start_color="00BFFF", end_color="00BFFF", fill_type="solid")
 FILL_ROSSO = PatternFill(start_color="DC143C", end_color="DC143C", fill_type="solid")
 SOGLIA_PPEAK_MAX = 135.0
+
+_LATO_NERO = Side(style="thin", color="000000")
+BORDO_NERO = Border(left=_LATO_NERO, right=_LATO_NERO, top=_LATO_NERO, bottom=_LATO_NERO)
+ALIGN_HEADER = Alignment(horizontal="center", vertical="center", wrap_text=True)
+ULTIMA_COLONNA = 30  # AD
 
 
 # ---------------------------------------------------------------------------
@@ -119,6 +124,14 @@ def _write_headers(ws):
     # Row 3: separatore
     ws["A3"] = "⌂"
 
+    # Intestazioni centrate con testo a capo (D1:D2 contiene tre righe)
+    for row in (1, 2):
+        for col in range(1, ULTIMA_COLONNA + 1):
+            ws.cell(row=row, column=col).alignment = ALIGN_HEADER
+    ws.column_dimensions["D"].width = 12
+    ws.row_dimensions[1].height = 24
+    ws.row_dimensions[2].height = 24
+
 
 def _get_descrizione(scheda_df, id_misura):
     rows = scheda_df[scheda_df["ID_misura"] == id_misura]
@@ -210,6 +223,11 @@ def write_excel(df_avg, df_mis, df_scheda, output_path):
         if val:
             max_len = max(max_len, len(str(val)))
     ws.column_dimensions["B"].width = max(max_len + 2, 8)
+
+    # Bordi neri su tutta la tabella (anche sulle celle coperte dai merge)
+    for row in range(1, excel_row):
+        for col in range(1, ULTIMA_COLONNA + 1):
+            ws.cell(row=row, column=col).border = BORDO_NERO
 
     wb.save(output_path)
     print(f"File salvato: {output_path}  ({excel_row - 4} righe dati)")
