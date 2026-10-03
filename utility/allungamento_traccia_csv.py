@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from io import StringIO
 import math
 
-file2extend = "/Users/theo/Desktop/P.IVA/Aziende/Ermes/Lavori/SIT - RSM/rev2/Rumore/misure/misD/20260226_183040_183106.csv"
+file2extend = "/Users/theo/Desktop/P.IVA/Aziende/Ermes/Lavori/AVICOOP-GESCO/rev/rev1/Rumore/misure/misF/AmaF_0068/20260605_130824_130841.csv"
 Ttot = 6  # durata minima desiderata in minuti
 
 TIME_FMT = "%H:%M:%S"

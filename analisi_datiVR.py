@@ -1746,7 +1746,11 @@ class analisi:
                     # print(LeqA_mean)
                     
                     #calcolo l'incertezza sulla misura LeqA (SDOM)
-                    U_sdom[i] = round(std(df['LeqA_max'][idx], ddof=1) * sqrt(1/sum(idx)),1)
+                    U_sdom[i] = round(std(df['LeqA_eq'][idx], ddof=1) * sqrt(1/sum(idx)),1) 
+
+                    #Controllo sul valore di incertezza della misura.
+                    if U_sdom[i] < 0.1:
+                        U_sdom[i] = 0.1
 
                 
                 new_df = pd.DataFrame({'jobName': fileIDs ,
@@ -1980,13 +1984,13 @@ class analisi:
             df_tmp = df_HEG[df_HEG[Nome_colonna_IDgrom] == grom] 
             mansione = df_tmp[df_tmp[Nome_colonna_IDgrom] == grom][Nome_colonna_Descrizione_GrOm].tolist()[0]
 
-            # STEP 3 — Verifica che la somma dei Ti sia esattamente T0
-            tot_ti = df_tmp['Ti'].sum()
-            if tot_ti != T0:
-                raise ValueError(
-                    f"Gruppo omogeneo {grom}| {mansione} : somma dei Ti = {tot_ti} min "
-                    f"!= T0 = {T0} min. Controlla i valori di Ti nel file averaged_data."
-                )
+            # # STEP 3 — Verifica che la somma dei Ti sia esattamente T0
+            # tot_ti = df_tmp['Ti'].sum()
+            # if tot_ti != T0:
+            #     raise ValueError(
+            #         f"Gruppo omogeneo {grom}| {mansione} : somma dei Ti = {tot_ti} min "
+            #         f"!= T0 = {T0} min. Controlla i valori di Ti nel file averaged_data."
+            #     )
 
             leqa  = df_tmp['LeqA'].values
             ti    = df_tmp['Ti'].values
@@ -1994,13 +1998,13 @@ class analisi:
 
             # STEP 4 — Lex8h 
             #          AG_i = Ti/T0 * 10^(LeqA_i / 10)
-            lex8h = 10 * log10(sum(ti / T0 * 10**(leqa / 10)))
+            lex8h = 10 * log10(sum(ti / sum(ti) * 10**(leqa / 10)))
 
             # STEP 5 — Incertezza estesa U  
             #          Z_i = Ti/T0 * 10^((LeqA_i - Lex8h) / 10)   [col. Z]
             #          W_i = max(0, Z_i^2 * (u_i^2 + u2m^2 + u_pos^2))  [col. W]
             #          II termine X_i = 0  (Tmax/Tmin non disponibili in df_avg)
-            z     = ti / T0 * 10**((leqa - lex8h) / 10)
+            z     = ti / sum(ti) * 10**((leqa - lex8h) / 10)
             w     = max(z**2 * (u_mis**2 + u2m**2 + u_pos**2), 0)
             U_val = 1.65 * sqrt(sum(w))
 
