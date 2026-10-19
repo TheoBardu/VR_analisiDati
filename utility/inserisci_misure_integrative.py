@@ -19,15 +19,15 @@ from openpyxl import load_workbook
 # PARAMETRI UTENTE
 # =============================================================================
 
-EXCEL_MISURE_INTEGRATIVE = r"C:\percorso\FAELUX_SRL_scheda_gruppi_dpi.xlsx"
-EXCEL_RILIEVI_FONOMETRICI = r"C:\percorso\Rilievi_Fonometrici.xlsx"
+EXCEL_MISURE_INTEGRATIVE = "/Users/theo/Desktop/P.IVA/Aziende/Ermes/Lavori/AVICOOP-GESCO/rev/rev1/AVICOOP-GESCO-_misure-scheda_gruppi_dpi.xlsx"
+EXCEL_RILIEVI_FONOMETRICI = "/Users/theo/Desktop/Rilievi_Fonometrici.xlsx"
 
 FOGLIO_MISURE_INTEGRATIVE = "misure integrative rumore"
-FOGLIO_RILIEVI_FONOMETRICI = "Rilievi Fonometrici"  # impostare None per usare il foglio attivo
+FOGLIO_RILIEVI_FONOMETRICI = "Dati"  # impostare None per usare il foglio attivo
 
 # Colonne del foglio integrativo (indici Excel, quindi A=1, B=2, ...).
 # Nel file allegato l'ID è in C; se nel tuo file è in A, impostare COLONNA_ID_INTEGRATIVE = 1.
-COLONNA_ID_INTEGRATIVE = 3
+COLONNA_ID_INTEGRATIVE = 2
 
 # Colonna ID nel foglio dei rilievi fonometrici.
 COLONNA_ID_RILIEVI = 1  # A
@@ -36,9 +36,9 @@ COLONNA_ID_RILIEVI = 1  # A
 # openpyxl usa indici a partire da 1: A=1, B=2, ...
 # File allegato: G:J, M:P, Q:T.
 GRUPPI_MISURE = [
-    {"tempo": 7,  "laeq": 8,  "lceq": 9,  "picco_c": 10},
-    {"tempo": 13, "laeq": 14, "lceq": 15, "picco_c": 16},
-    {"tempo": 17, "laeq": 18, "lceq": 19, "picco_c": 20},
+    {"tempo": 8,  "laeq": 9,  "lceq": 10,  "picco_c": 11},
+    {"tempo": 14, "laeq": 15, "lceq": 16, "picco_c": 17},
+    {"tempo": 18, "laeq": 19, "lceq": 20, "picco_c": 21},
     # Esempi per aggiungere altre misure (modificare gli indici):
     # {"tempo": 21, "laeq": 22, "lceq": 23, "picco_c": 24},
     # {"tempo": 25, "laeq": 26, "lceq": 27, "picco_c": 28},
